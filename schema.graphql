@@ -1,5 +1,344 @@
-type ExampleEntity @entity {
+type Event @entity {
   id: ID!
-  block: Bytes!
-  count: BigInt!
+  name: String!
+  args: String!
+  timestamp: BigInt!
 }
+
+type Method @entity {
+  id: ID!
+  name: String!
+  args: String!
+  timestamp: BigInt!
+}
+
+type LendingProtocol @entity {
+  id: ID!
+  owner: String!
+  oracle: String!
+  booster: Token!
+  boosterMultiplier: BigInt!
+  maxAssets: Int!
+}
+
+type Market @entity {
+  id: ID!
+  underlyingToken: Token!
+  totalBorrows: BigInt!
+  totalDeposits: BigInt!
+  totalBorrowers: Int!
+  totalDepositers: Int!
+  positions: [Position!]! @derivedFrom(field: "market")
+}
+
+type Position @entity {
+  id: ID!
+  account: Account!
+  market: Market!
+  collateral: BigInt!
+  deposited: BigInt!
+  totalDeposited: BigInt!
+  totalWithdrawn: BigInt!
+  borrowed: BigInt!
+  totalBorrowed: BigInt!
+  totalRepaid: BigInt!
+  borrows: [Borrow!]! @derivedFrom(field: "position")
+  repayments: [Repay!]! @derivedFrom(field: "position")
+  deposits: [Deposit!]! @derivedFrom(field: "position")
+  withdrawals: [Withdraw!]! @derivedFrom(field: "position")
+}
+
+##############################
+##### Account-Level Data #####
+##############################
+
+type Account @entity {
+  " { Account address } "
+  id: ID!
+
+  " Number of positions this account has "
+  positionCount: Int!
+
+  " All positions that belong to this account "
+  positions: [Position!]! @derivedFrom(field: "account")
+
+  " Number of open positions this account has "
+  openPositionCount: Int!
+
+  " Number of closed positions this account has "
+  closedPositionCount: Int!
+
+  " Number of deposits this account made "
+  depositCount: Int!
+
+  " All deposit events of this account "
+  deposits: [Deposit!]! @derivedFrom(field: "account")
+
+  " Number of withdrawals this account made "
+  withdrawCount: Int!
+
+  " All withdraw events of this account "
+  withdraws: [Withdraw!]! @derivedFrom(field: "account")
+
+  " Number of borrows this account made "
+  borrowCount: Int!
+
+  " All borrow events of this account "
+  borrows: [Borrow!]! @derivedFrom(field: "account")
+
+  " Number of repays this account made "
+  repayCount: Int!
+
+  " All repay events of this account "
+  repays: [Repay!]! @derivedFrom(field: "account")
+
+  " Number of times this account liquidated a position "
+  liquidateCount: Int!
+
+  " All liquidation events where this account was the liquidator "
+  liquidates: [Liquidate!]! @derivedFrom(field: "liquidator")
+
+  " Number of times this account has been liquidated "
+  liquidationCount: Int!
+
+  " All liquidation events where this account got liquidated "
+  liquidations: [Liquidate!]! @derivedFrom(field: "liquidatee")
+}
+
+
+type Token @entity {
+  " Smart contract address of the token "
+  id: ID!
+
+  " Name of the token, mirrored from the smart contract "
+  name: String!
+
+  " Symbol of the token, mirrored from the smart contract "
+  symbol: String!
+
+  " The number of decimal places this token uses, default to 18 "
+  decimals: Int!
+
+  " Optional field to track the price of a token, mostly for caching purposes "
+  lastPriceUSD: BigDecimal
+
+  " Optional field to track the block number of the last token price "
+  lastPriceBlockNumber: BigInt
+}
+
+
+##################################
+##### Event-Level Data #####
+##################################
+
+"""
+An event is any user action that occurs in a protocol. Generally, they are Ethereum events
+emitted by a function in the smart contracts, stored in transaction receipts as event logs.
+However, some user actions of interest are function calls that don't emit events. For example,
+the deposit and withdraw functions in Yearn do not emit any events. In our subgraphs, we still
+store them as events, although they are not technically Ethereum events emitted by smart
+contracts.
+"""
+
+type Deposit @entity {
+  " { Transaction hash }-{ Log index } "
+  id: ID!
+
+  " Transaction hash of the transaction that emitted this event "
+  hash: String!
+
+  " Nonce of the transaction that emitted this event "
+  nonce: BigInt!
+
+  " Event log index. For transactions that don't emit event, create arbitrary index starting from 0 "
+  logIndex: Int!
+
+  " Block number of this event "
+  blockNumber: BigInt!
+
+  " Timestamp of this event "
+  timestamp: BigInt!
+
+  " Account that deposited tokens "
+  account: Account!
+
+  " The market tokens are deposited to "
+  market: Market!
+
+  " The user position changed by this event "
+  position: Position!
+
+  " Token deposited "
+  asset: Token!
+
+  " Amount of token deposited in native units "
+  amount: BigInt!
+
+  " Amount of token deposited in USD "
+  amountUSD: BigDecimal!
+}
+
+type Withdraw @entity {
+  " { Transaction hash }-{ Log index }"
+  id: ID!
+
+  " Transaction hash of the transaction that emitted this event "
+  hash: String!
+
+  " Nonce of the transaction that emitted this event "
+  nonce: BigInt!
+
+  " Event log index. For transactions that don't emit event, create arbitrary index starting from 0 "
+  logIndex: Int!
+
+  " Block number of this event "
+  blockNumber: BigInt!
+
+  " Timestamp of this event "
+  timestamp: BigInt!
+
+  " Account that withdrew tokens "
+  account: Account!
+
+  " The market tokens are withdrew from "
+  market: Market!
+
+  " The user position changed by this event "
+  position: Position!
+
+  " Token withdrawn "
+  asset: Token!
+
+  # Certain protocols (e.g. MakerDAO) uses a negative amount for withdraws. You
+  # should convert them to positive for consistency.
+  # e.g. Event log 27 in https://etherscan.io/tx/0xe957cf6252c7712c218c842c1ade672bf5ce529f8512f7a5ce7ebc8afa4ec690#eventlog
+
+  " Amount of token withdrawn in native units "
+  amount: BigInt!
+
+  " Amount of token withdrawn in USD "
+  amountUSD: BigDecimal!
+}
+
+# For CDPs, use this for mint events
+type Borrow @entity {
+  " { Transaction hash }-{ Log index } "
+  id: ID!
+
+  " Transaction hash of the transaction that emitted this event "
+  hash: String!
+
+  " Nonce of the transaction that emitted this event "
+  nonce: BigInt!
+
+  " Event log index. For transactions that don't emit event, create arbitrary index starting from 0 "
+  logIndex: Int!
+
+  " Block number of this event "
+  blockNumber: BigInt!
+
+  " Timestamp of this event "
+  timestamp: BigInt!
+
+  " Account that borrowed/minted tokens "
+  account: Account!
+
+  " The market tokens are borrowed/minted from "
+  market: Market!
+
+  " The user position changed by this event "
+  position: Position!
+
+  " Token borrowed "
+  asset: Token!
+
+  " Amount of token borrowed in native units "
+  amount: BigInt!
+
+  " Amount of token borrowed in USD "
+  amountUSD: BigDecimal!
+}
+
+# For CDPs, use this for burn events
+type Repay @entity {
+  " { Transaction hash }-{ Log index } "
+  id: ID!
+
+  " Transaction hash of the transaction that emitted this event "
+  hash: String!
+
+  " Nonce of the transaction that emitted this event "
+  nonce: BigInt!
+
+  " Event log index. For transactions that don't emit event, create arbitrary index starting from 0 "
+  logIndex: Int!
+
+  " Block number of this event "
+  blockNumber: BigInt!
+
+  " Timestamp of this event "
+  timestamp: BigInt!
+
+  " Account that repaid/burned tokens "
+  account: Account!
+
+  " The market tokens are repaid/burned to "
+  market: Market!
+
+  " The user position changed by this event "
+  position: Position!
+
+  " Token repaid/burned "
+  asset: Token!
+
+  " Amount of token repaid/burned in native units "
+  amount: BigInt!
+
+  " Amount of token repaid/burned in USD "
+  amountUSD: BigDecimal!
+}
+
+type Liquidate @entity {
+  " { Transaction hash }-{ Log index } "
+  id: ID!
+
+  " Transaction hash of the transaction that emitted this event "
+  hash: String!
+
+  " Nonce of the transaction that emitted this event "
+  nonce: BigInt!
+
+  " Event log index. For transactions that don't emit event, create arbitrary index starting from 0 "
+  logIndex: Int!
+
+  " Block number of this event "
+  blockNumber: BigInt!
+
+  " Timestamp of this event "
+  timestamp: BigInt!
+
+  " Account that carried out the liquidation "
+  liquidator: Account!
+
+  " Account that got liquidated "
+  liquidatee: Account!
+
+  " The market of the collateral being used "
+  market: Market!
+
+  " The user position changed by this event "
+  position: Position!
+
+  " Asset repaid (borrowed) "
+  asset: Token!
+
+  " Amount of collateral liquidated in native units "
+  amount: BigInt!
+
+  " Amount of collateral liquidated in USD "
+  amountUSD: BigDecimal!
+
+  " Amount of profit from liquidation in USD "
+  profitUSD: BigDecimal!
+}
+
