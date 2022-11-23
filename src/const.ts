@@ -6,6 +6,18 @@ export const BI_ONE = BigInt.fromString("1")
 export const BD_ZERO = BigDecimal.fromString("0")
 export const BD_ONE = BigDecimal.fromString("1")
 export const ADDRESS_ZERO = "0x0000000000000000000000000000000000000000"
+
+export const BI_BD = (n: BigInt): BigDecimal => BigDecimal.fromString(n.toString());
+export const BD = (n: string): BigDecimal => BigDecimal.fromString(n);
+
+export const BIGDECIMAL_ONE = BD("1");
+export const BIGDECIMAL_TWO = BD("2");
+export const BIGDECIMAL_THREE = BD("3");
+export const BIGDECIMAL_TWELVE = BD("12");
+export const BIGDECIMAL_SIX = BD("6");
+
+
+
 export const assets = new TypedMap<string, TokenMetadata>()
 
 class TokenMetadata {
@@ -27,7 +39,7 @@ assets.set("meta-pool.near", new TokenMetadata(
 assets.set("usn", new TokenMetadata(
     "USN Stablecoin",
     "USN",
-    24,
+    18,
     0
 ))
 
@@ -84,5 +96,26 @@ assets.set("linear-protocol.near", new TokenMetadata(
     "LiNEAR",
     "liNEAR",
     24,
+    0
+))
+
+assets.set("4691937a7508860f876c9c0a2a617e7d9e945d4b.factory.bridge.near", new TokenMetadata(
+    "Wootrade Network",
+    "WOO",
+    18,
+    0
+))
+
+assets.set("aaaaaa20d9e0e2461697782ef11675f668207961.factory.bridge.near", new TokenMetadata(
+    "Aurora",
+    "AURORA",
+    18,
+    0
+))
+
+assets.set("meta-token.near", new TokenMetadata(
+    "Meta Token",
+    "META",
+    18,
     0
 ))

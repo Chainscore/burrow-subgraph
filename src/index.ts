@@ -13,7 +13,9 @@ import {
 
 import {Event, Method} from "../generated/schema";
 
-import { handleDeposit, handleNew, handleOracleCall, handleWithdraw, handleBorrow, handleRepayment, handleLiquidate } from './mapping';
+import { handleDeposit, handleWithdraw, handleBorrow, handleRepayment, handleLiquidate } from './mapping';
+import { handleNewAsset, handleNew } from './config_calls';
+import { handleOracleCall } from "./oracle_calls";
 
 export function handleReceipt(receipt: near.ReceiptWithOutcome): void {
 	const actions = receipt.receipt.actions;
@@ -56,6 +58,19 @@ function handleAction(
 		const dataArr = data.toArray();
 		const dataObj: TypedMap<string, JSONValue> = dataArr[0].toObject();
 		let args = argsData.value.toObject()
+		if(event.toString() == "deposit"){
+			let result = ""
+			for(let i = 0; i < receipt.receipt.actions.length; i++) {
+				log.info("Action type {}", [receipt.receipt.actions[i].kind.toString()])
+				if (receipt.receipt.actions[i].kind == near.ActionKind.FUNCTION_CALL) {
+					result = result.concat("<<<>>>")
+					result = result.concat(receipt.receipt.actions[i].toFunctionCall().methodName)
+					result = result.concat("::")
+					result = result.concat(receipt.receipt.actions[i].toFunctionCall().args.toString())
+				}
+			}
+			log.info(`DEPOSIT:: {} {}`, [outcomeLog, result])
+		}
 		handleEvent(event.toString(), dataObj, outcomeLog, receipt, logIndex, methodName, args);
 	}
 }
@@ -76,10 +91,10 @@ function handleEvent(
 	_event.timestamp = BigInt.fromString(receipt.block.header.timestampNanosec.toString())
     _event.save();
 
+	// if(event == "increase_collateral"){
+	// 	handleDeposit(data, receipt, logIndex, method, args)
+	// }
 	if(event == "deposit"){
-		handleDeposit(data, receipt, logIndex, method, args)
-	}
-	else if(event == "deposit_to_reserve"){
 		handleDeposit(data, receipt, logIndex, method, args)
 	}
 	else if(event == "withdraw_succeeded"){
@@ -111,8 +126,11 @@ function handleMethod(
 
 	if(method == "new") {
 		handleNew(method, args, data, receipt)
-	}
+	} 
 	else if(method == "oracle_on_call") {
 		handleOracleCall(method, args, data, receipt)
+	} 
+	else if(method == "add_asset" || method == "update_asset") {
+		handleNewAsset(method, args, data, receipt)
 	}
 }
