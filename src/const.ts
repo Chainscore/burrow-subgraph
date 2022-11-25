@@ -119,3 +119,11 @@ assets.set("meta-token.near", new TokenMetadata(
     18,
     0
 ))
+
+// v2-nearx.stader-labs.near
+assets.set("v2-nearx.stader-labs.near", new TokenMetadata(
+    "Stader NearX",
+    "NEARX",
+    18,
+    0
+))

@@ -8,10 +8,10 @@ import {
 	JSONValueKind,
 	json,
 } from '@graphprotocol/graph-ts';
+import { getOrCreateToken } from './helpers/token';
 import {
-	getOrCreateController,
-	getOrCreateToken,
-} from './helpers';
+	getOrCreateProtocol,
+} from './helpers/protocol';
 
 export function handleOracleCall(
 	method: string,
@@ -19,7 +19,7 @@ export function handleOracleCall(
 	data: TypedMap<string, JSONValue>,
 	receipt: near.ReceiptWithOutcome
 ): void {
-	let controller = getOrCreateController();
+	let controller = getOrCreateProtocol();
 	let eventArgsArr = data.get('data');
 	if (!eventArgsArr) {
 		log.info('ORACLE::Data not found {}', [args]);

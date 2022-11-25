@@ -1,19 +1,13 @@
 import { Market, InterestRate } from "../generated/schema";
 import { BigDecimal, BigInt, near, log } from "@graphprotocol/graph-ts";
 import { BD_ONE, BD_ZERO, BI_ZERO } from "./const";
-import { getOrCreateBorrowRate, getOrCreateToken } from "./helpers";
+import { getOrCreateBorrowRate } from "./helpers/rates";
+
 import { getRate } from "./rates";
 import { bigDecimalExponential } from "./utils";
 
 const BI_BD = (n: BigInt): BigDecimal => BigDecimal.fromString(n.toString());
 const BD = (n: string): BigDecimal => BigDecimal.fromString(n);
-
-const BIGDECIMAL_ONE = BD("1");
-const BIGDECIMAL_TWO = BD("2");
-const BIGDECIMAL_THREE = BD("3");
-const BIGDECIMAL_TWELVE = BD("12");
-const BIGDECIMAL_SIX = BD("6");
-
 
 export function compound(market: Market, block: near.Block): Market {
 	let time_diff_ms = BigInt.fromU64((block.header.timestampNanosec / (1e6 as u64))).minus(market._last_update_timestamp);
@@ -74,9 +68,9 @@ export function compound(market: Market, block: near.Block): Market {
 			.times(market._reserveRatio.divDecimal(BD("10000")))
 			.truncate(0);
 
-		if (market._totalDeposited.ge(BI_ZERO)) {
+		if (market.inputTokenBalance.ge(BI_ZERO)) {
 			market._totalReserved = market._totalReserved.plus(BigInt.fromString(reserved.toString()));
-			market._totalDeposited = market._totalDeposited.plus(
+			market.inputTokenBalance = market.inputTokenBalance.plus(
 				BigInt.fromString(interest.minus(reserved).toString())
 			);
 		} else {

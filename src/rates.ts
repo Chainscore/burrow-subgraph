@@ -1,7 +1,7 @@
 import { Market, InterestRate } from "../generated/schema";
 import { BigDecimal, BigInt, near, log } from "@graphprotocol/graph-ts";
 import { BD_ONE, BD_ZERO, BI_ZERO } from "./const";
-import { getOrCreateBorrowRate, getOrCreateSupplyRate, getOrCreateToken } from "./helpers";
+import { getOrCreateBorrowRate, getOrCreateSupplyRate } from "./helpers/rates";
 import { bigDecimalExponential } from "./utils";
 
 const BI_BD = (n: BigInt): BigDecimal => BigDecimal.fromString(n.toString());
@@ -9,18 +9,28 @@ const BD = (n: string): BigDecimal => BigDecimal.fromString(n);
 
 
 export function getRate(market: Market): BigDecimal {
-	if (market._totalDeposited.equals(BI_ZERO)) {
+	if (market.inputTokenBalance.equals(BI_ZERO)) {
 		return BD_ONE;
 	}
 	let pos = BI_BD(market._totalBorrowed).div(
-		BI_BD(market._totalReserved.plus(market._totalDeposited))
+		BI_BD(market._totalReserved.plus(market.inputTokenBalance))
 	);
+
+	if(pos.gt(BD_ONE)){
+		log.warning("getRate() :: pos > 1 {} :: Borrowed {} Deposited {} Reserve {}", [
+			pos.toString(),
+			market._totalBorrowed.toString(),
+			market.inputTokenBalance.toString(),
+			market._totalReserved.toString(),
+		]);
+		pos = BD_ONE;
+	}
+
 	market._utilization = pos;
 	let target = BI_BD(market._target_utilization).div(BD("10000"));
 	let rate = BD_ZERO;
 
 	if (pos.le(target)) {
-
 		// BigDecimal::one() + pos * (BigDecimal::from(self.target_utilization_rate) - BigDecimal::one())/ target_utilization
 		
         let highPos = BI_BD(market._target_utilization_rate)
@@ -69,7 +79,7 @@ export function updateApr(market: Market): void {
 		BD_ONE.minus(BI_BD(market._reserveRatio).div(BD("10000")))
 	);
 	let supply_apr = annualSupplyInterest.div(
-		BD(market._totalDeposited.toString())
+		BD(market.inputTokenBalance.toString())
 	);
 
 	/* -------------------------------------------------------------------------- */

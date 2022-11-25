@@ -1,7 +1,6 @@
 import { BigDecimal, BigInt, near, log } from "@graphprotocol/graph-ts";
 import { BD_ONE, BD_ZERO, BIGDECIMAL_ONE, BIGDECIMAL_SIX, BIGDECIMAL_THREE, BIGDECIMAL_TWELVE, BIGDECIMAL_TWO, BI_ZERO } from "./const";
 
-
 // a fast approximation of (1 + rate)^exponent
 export function bigDecimalExponential(
 	rate: BigDecimal,
@@ -32,4 +31,12 @@ export function bigDecimalExponential(
 		.plus(secondTerm)
 		.plus(thirdTerm)
 		.plus(fourthTerm);
+}
+
+// convert token amounts to output shares
+export function amount_to_shares(amount: BigInt, total_shares: BigInt, total_amount: BigInt): BigInt {
+	if (total_amount.equals(BI_ZERO)) {
+		return amount;
+	}
+	return amount.times(total_shares).div(total_amount);
 }
