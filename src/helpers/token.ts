@@ -1,8 +1,8 @@
 import { BigInt, log, BigDecimal, near } from "@graphprotocol/graph-ts";
 import { Token, Market } from "../../generated/schema";
-import { compound } from "../compound";
-import { assets, BI_ZERO, BD_ZERO, ADDRESS_ZERO } from "../const";
-import { updateApr } from "../rates";
+import { compound } from "../utils/compound";
+import { assets, BI_ZERO, BD_ZERO, ADDRESS_ZERO } from "../utils/const";
+import { updateApr } from "../utils/rates";
 import { getOrCreateProtocol } from "./protocol";
 
 export function getOrCreateToken(id: string): Token {

@@ -8,10 +8,10 @@ import {
 	JSONValueKind,
 	json,
 } from '@graphprotocol/graph-ts';
-import { getOrCreateToken } from './helpers/token';
+import { getOrCreateToken } from '../helpers/token';
 import {
 	getOrCreateProtocol,
-} from './helpers/protocol';
+} from '../helpers/protocol';
 
 export function handleOracleCall(
 	method: string,

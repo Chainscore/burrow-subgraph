@@ -13,9 +13,11 @@ import {
 
 import {Event, Method} from "../generated/schema";
 
-import { handleDeposit, handleWithdraw, handleBorrow, handleRepayment, handleLiquidate } from './mapping';
-import { handleNewAsset, handleNew } from './config_calls';
-import { handleOracleCall } from "./oracle_calls";
+import { handleDeposit, handleWithdraw, handleBorrow, handleRepayment, handleLiquidate } from './handlers/actions';
+import { handleNew } from './utils/config';
+import { handleNewAsset } from './handlers/market';
+
+import { handleOracleCall } from "./handlers/oracle_calls";
 
 export function handleReceipt(receipt: near.ReceiptWithOutcome): void {
 	const actions = receipt.receipt.actions;

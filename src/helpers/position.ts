@@ -1,5 +1,5 @@
 import { Market, Position } from "../../generated/schema";
-import { assets, BI_ZERO, BD_ZERO, ADDRESS_ZERO } from "../const";
+import { assets, BI_ZERO, BD_ZERO, ADDRESS_ZERO } from "../utils/const";
 import { getOrCreateAccount } from "./account";
 import { getOrCreateMarket } from "./market";
 
@@ -28,5 +28,3 @@ export function getOrCreatePosition(account: string, market: string, side: strin
 	}
 	return r;
 }
-
-export function updatePosition(position: Position, market: Market): void {}

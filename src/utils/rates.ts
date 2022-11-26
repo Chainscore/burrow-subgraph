@@ -1,8 +1,8 @@
-import { Market, InterestRate } from "../generated/schema";
+import { Market, InterestRate } from "../../generated/schema";
 import { BigDecimal, BigInt, near, log } from "@graphprotocol/graph-ts";
 import { BD_ONE, BD_ZERO, BI_ZERO } from "./const";
-import { getOrCreateBorrowRate, getOrCreateSupplyRate } from "./helpers/rates";
-import { bigDecimalExponential } from "./utils";
+import { getOrCreateBorrowRate, getOrCreateSupplyRate } from "../helpers/rates";
+import { bigDecimalExponential } from "./math";
 
 const BI_BD = (n: BigInt): BigDecimal => BigDecimal.fromString(n.toString());
 const BD = (n: string): BigDecimal => BigDecimal.fromString(n);

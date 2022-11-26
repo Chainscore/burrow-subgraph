@@ -32,11 +32,3 @@ export function bigDecimalExponential(
 		.plus(thirdTerm)
 		.plus(fourthTerm);
 }
-
-// convert token amounts to output shares
-export function amount_to_shares(amount: BigInt, total_shares: BigInt, total_amount: BigInt): BigInt {
-	if (total_amount.equals(BI_ZERO)) {
-		return amount;
-	}
-	return amount.times(total_shares).div(total_amount);
-}

@@ -8,15 +8,17 @@ import {
 	JSONValueKind,
 	json,
 } from '@graphprotocol/graph-ts';
-import { getOrCreateAccount } from './helpers/account';
-import { getOrCreatePosition, updatePosition } from './helpers/position';
-import { getOrCreateBorrow, getOrCreateDeposit, getOrCreateLiquidation, getOrCreateRepayment, getOrCreateWithdrawal,  } from './helpers/actions';
-import { getOrCreateMarket } from './helpers/market';
-import { getOrCreateToken } from './helpers/token';
+import { getOrCreateAccount } from '../helpers/account';
+import { updatePosition } from '../update/position';
+import { getOrCreatePosition } from '../helpers/position';
 
-import { updateMarket } from './helpers/market';
-import { amount_to_shares } from './utils';
-import { updateProtocol } from './helpers/protocol';
+import { getOrCreateBorrow, getOrCreateDeposit, getOrCreateLiquidation, getOrCreateRepayment, getOrCreateWithdrawal,  } from '../helpers/actions';
+import { getOrCreateMarket } from '../helpers/market';
+import { getOrCreateToken } from '../helpers/token';
+
+import { updateMarket } from '../update/market';
+import { amount_to_shares } from '../utils/shares';
+import { updateProtocol } from '../update/protocol';
 
 /**
  * ------------------------------------------------------------------

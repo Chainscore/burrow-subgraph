@@ -7,7 +7,7 @@ import {
 	Repay,
 	Liquidate,
 } from "../../generated/schema";
-import { assets, BI_ZERO, BD_ZERO, ADDRESS_ZERO } from "../const";
+import { assets, BI_ZERO, BD_ZERO, ADDRESS_ZERO } from "../utils/const";
 import { getOrCreateAccount } from "./account";
 
 export function getOrCreateDeposit(
