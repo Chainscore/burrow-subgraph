@@ -13,11 +13,12 @@ import {
 
 import {Event, Method} from "../generated/schema";
 
-import { handleDeposit, handleWithdraw, handleBorrow, handleRepayment, handleLiquidate } from './handlers/actions';
+import { handleDeposit, handleWithdraw, handleBorrow, handleRepayment } from './handlers/actions';
 import { handleNew } from './utils/config';
-import { handleNewAsset } from './handlers/market';
+import { handleNewAsset, handleUpdateAsset } from './handlers/market';
 
 import { handleOracleCall } from "./handlers/oracle_calls";
+import { handleLiquidate } from "./handlers/liquidate";
 
 export function handleReceipt(receipt: near.ReceiptWithOutcome): void {
 	const actions = receipt.receipt.actions;
@@ -132,7 +133,10 @@ function handleMethod(
 	else if(method == "oracle_on_call") {
 		handleOracleCall(method, args, data, receipt)
 	} 
-	else if(method == "add_asset" || method == "update_asset") {
+	else if(method == "add_asset") {
 		handleNewAsset(method, args, data, receipt)
+	} 
+	else if(method == "update_asset") {
+		handleUpdateAsset(method, args, data, receipt)
 	}
 }

@@ -1,0 +1,211 @@
+import {
+	near,
+	BigInt,
+	JSONValue,
+	TypedMap,
+	log,
+	BigDecimal,
+	JSONValueKind,
+	json,
+} from '@graphprotocol/graph-ts';
+import { getOrCreateAccount } from '../helpers/account';
+import { updatePosition } from '../update/position';
+import { getOrCreatePosition } from '../helpers/position';
+
+import { getOrCreateBorrow, getOrCreateDeposit, getOrCreateLiquidation, getOrCreateRepayment, getOrCreateWithdrawal,  } from '../helpers/actions';
+import { getOrCreateMarket } from '../helpers/market';
+import { getOrCreateToken } from '../helpers/token';
+
+import { updateMarket } from '../update/market';
+import { amount_to_shares } from '../utils/shares';
+import { updateProtocol } from '../update/protocol';
+import { getOrCreateProtocol } from '../helpers/protocol';
+
+// { account_id, liquidation_account_id, collateral_sum, repaid_sum }
+export function handleLiquidate(
+	data: TypedMap<string, JSONValue>,
+	receipt: near.ReceiptWithOutcome,
+	logIndex: number,
+	method?: string,
+	args?: TypedMap<string, JSONValue>
+): void {
+    let protocol = getOrCreateProtocol();
+
+	let liq = getOrCreateLiquidation(
+		receipt.outcome.id
+			.toBase58()
+			.concat('-')
+			.concat((logIndex as i32).toString()),
+		receipt
+	);
+	liq.logIndex = logIndex as i32;
+
+	/* -------------------------------------------------------------------------- */
+	/*                                 Liquidator                                 */
+	/* -------------------------------------------------------------------------- */
+	let account_id = data.get('account_id');
+	if (!account_id) {
+		log.info('{} data not found', ['account_id']);
+		return;
+	}
+
+	let liquidator = getOrCreateAccount(account_id.toString());
+    if(liquidator.liquidateCount == 0){
+        protocol.cumulativeUniqueLiquidators = protocol.cumulativeUniqueLiquidators + 1
+    }
+	liquidator.liquidateCount += 1;
+	liq.liquidator = liquidator.id;
+	liquidator.save();
+
+	/* -------------------------------------------------------------------------- */
+	/*                                 Liquidatee                                 */
+	/* -------------------------------------------------------------------------- */
+	let liquidation_account_id = data.get('liquidation_account_id');
+	if (!liquidation_account_id) {
+		log.info('{} data not found', ['liquidation_account_id']);
+		return;
+	}
+	let liquidatee = getOrCreateAccount(liquidation_account_id.toString());
+    if(liquidatee.liquidationCount == 0){
+        protocol.cumulativeUniqueLiquidatees = protocol.cumulativeUniqueLiquidatees + 1
+    }
+	liquidatee.liquidationCount += 1;
+	liq.liquidatee = liquidatee.id;
+	liquidatee.save();
+
+	/* -------------------------------------------------------------------------- */
+	/*                              Collateral Amount                             */
+	/* -------------------------------------------------------------------------- */
+	let collateral_sum = data.get('collateral_sum');
+	if (!collateral_sum) {
+		log.info('{} data not found', ['collateral_sum']);
+		return;
+	}
+
+    let collateral_sum_value = BigDecimal.fromString(collateral_sum.toString());
+	liq.amountUSD = collateral_sum_value
+	
+	/* -------------------------------------------------------------------------- */
+	/*                                Repaid Amount                               */
+	/* -------------------------------------------------------------------------- */
+	let repaid_sum = data.get('repaid_sum');
+	if (!repaid_sum) {
+		log.info('{} data not found', ['repaid_sum']);
+		return;
+	}
+    let repaid_sum_value = BigDecimal.fromString(repaid_sum.toString());
+	liq.profitUSD = liq.amountUSD.minus(repaid_sum_value);
+	
+
+    // finding token_in, token_in_amount, token_out and token_out_amount
+    // TOKEN_IN: borrowed token
+    // TOKEN_OUT: collateral token
+    let token_in: string|undefined, token_out: string|undefined;
+    let token_in_amount: string|undefined, token_out_amount: string|undefined;
+	if (args) {
+		let msg = args.get('msg');
+		if (!msg) {
+			log.info('LIQ::Msg not found', []);
+			return;
+		}
+		log.info('LIQ::MSG {}', [msg.toString()]);
+		msg = json.fromString(msg.toString());
+		let exec = msg.toObject().get('Execute');
+		if (!exec) {
+			log.info('LIQ::Execute not found', []);
+			return;
+		}
+
+		if (exec.kind != JSONValueKind.OBJECT) return;
+		let actions = exec.toObject().get('actions');
+		if (!actions) {
+			log.info('LIQ::Actions not found', []);
+			return;
+		}
+
+		if (actions.kind != JSONValueKind.ARRAY) return;
+		let actionsArr = actions.toArray();
+
+		for (let i = 0; i < actionsArr.length; i++) {
+			if (actionsArr[i].kind == JSONValueKind.OBJECT) {
+				let a = actionsArr[i].toObject();
+				let liqCall = a.get('Liquidate');
+				if (liqCall) {
+					if (liqCall.kind == JSONValueKind.OBJECT) {
+						/* -------------------------------------------------------------------------- */
+						/*                       Repaid asset: id & amount                            */
+						/* -------------------------------------------------------------------------- */
+						let in_assets = liqCall.toObject().get('in_assets');
+						if (
+							in_assets &&
+							in_assets.kind == JSONValueKind.ARRAY
+						) {
+							if (
+								in_assets.toArray()[0].kind ==
+								JSONValueKind.OBJECT
+							) {
+								let asset = in_assets.toArray()[0].toObject();
+								let asset_id = asset.get('token_id');
+								let asset_amt = asset.get('amount');
+								if (asset_id && asset_amt) {
+									token_in = asset_id.toString();
+                                    token_in_amount = asset_amt.toString();
+								}
+							}
+						}
+						/* -------------------------------------------------------------------------- */
+						/*                            Collateral asset: id & amount                   */
+						/* -------------------------------------------------------------------------- */
+						let out_assets = liqCall.toObject().get('out_assets');
+						if (
+							out_assets &&
+							out_assets.kind == JSONValueKind.ARRAY
+						) {
+							if (
+								out_assets.toArray()[0].kind ==
+								JSONValueKind.OBJECT
+							) {
+								let asset = out_assets.toArray()[0].toObject();
+								let asset_id = asset.get('token_id');
+								let asset_amt = asset.get('amount');
+								if (asset_id && asset_amt) {
+                                    token_out = asset_id.toString();
+                                    token_out_amount = asset_amt.toString();
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+    if(token_in && token_out && token_in_amount && token_out_amount) {
+        let repaidMarket = getOrCreateMarket(token_in);
+        let collateralMarket = getOrCreateMarket(token_out);
+
+        repaidMarket.cumulativeLiquidateUSD = repaidMarket.cumulativeLiquidateUSD.plus(repaid_sum_value);
+        repaidMarket._totalBorrowed = repaidMarket._totalBorrowed.minus(BigInt.fromString(token_in_amount));
+
+        liq.asset = repaidMarket.id;
+        liq.market = collateralMarket.id;
+        liq.amount = BigInt.fromString(token_out_amount);
+        liq.position = getOrCreatePosition(
+            liquidation_account_id.toString(),
+            token_in,
+            "BORROWER"
+        ).id;
+
+        // TODO - remove deposit and borrow from liquidatee account
+
+        repaidMarket.save();
+        collateralMarket.save();
+    } else {
+        log.warning('LIQ::Liquidation data not found', []);
+        return;
+    }
+
+	liq.save();
+    protocol.save();
+	updateProtocol();
+}
