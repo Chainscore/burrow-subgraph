@@ -9,8 +9,8 @@ import { bigDecimalExponential } from "./math";
 const BI_BD = (n: BigInt): BigDecimal => BigDecimal.fromString(n.toString());
 const BD = (n: string): BigDecimal => BigDecimal.fromString(n);
 
-export function compound(market: Market, block: near.Block): Market {
-	let time_diff_ms = BigInt.fromU64((block.header.timestampNanosec / (1e6 as u64))).minus(market._last_update_timestamp);
+export function compound(market: Market, receipt: near.ReceiptWithOutcome): Market {
+	let time_diff_ms = BigInt.fromU64((receipt.block.header.timestampNanosec / (1e6 as u64))).minus(market._last_update_timestamp);
 	
 	if (time_diff_ms.gt(BI_ZERO)) {
 		// update timestamp

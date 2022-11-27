@@ -10,35 +10,34 @@ import {
 } from '@graphprotocol/graph-ts';
 import { getOrCreateAccount } from '../helpers/account';
 import { updatePosition } from '../update/position';
-import { getOrCreatePosition } from '../helpers/position';
+import { getOrCreatePosition, getOrCreatePositionSnapshot } from '../helpers/position';
 
 import { getOrCreateBorrow, getOrCreateDeposit, getOrCreateLiquidation, getOrCreateRepayment, getOrCreateWithdrawal,  } from '../helpers/actions';
-import { getOrCreateMarket } from '../helpers/market';
+import { getOrCreateMarket, getOrCreateMarketDailySnapshot, getOrCreateMarketHourlySnapshot } from '../helpers/market';
 import { getOrCreateToken } from '../helpers/token';
 
 import { updateMarket } from '../update/market';
 import { amount_to_shares } from '../utils/shares';
 import { updateProtocol } from '../update/protocol';
+import { getOrCreateUsageMetricsDailySnapshot, getOrCreateUsageMetricsHourlySnapshot, getOrCreateFinancialDailySnapshot } from '../helpers/protocol';
 
-/**
- * ------------------------------------------------------------------
- * ----------------------------- Events -----------------------------
- * ------------------------------------------------------------------
- * deposit_to_reserve     { account_id, amount, token_id }
- * deposit                - same as above
- * withdraw_started       - same as above
- * withdraw_failed        - same as above
- * withdraw_succeeded     - same as above
- * increase_collateral    - same as above
- * decrease_collateral    - same as above
- * borrow                 - same as above
- * repay                  - same as above
- * liquidate              { account_id, liquidation_account_id, collateral_sum, repaid_sum }
- * force_close            { liquidation_account_id, collateral_sum, repaid_sum }
- * booster_stake          { account_id, booster_amount, duration, x_booster_amount, total_booster_amount, total_x_booster_amount }
- * booster_unstake        { account_id, total_booster_amount, total_x_booster_amount }
- * ------------------------------------------------------------------
- */
+// ------------------------------------------------------------------
+// ----------------------------- Events -----------------------------
+// ------------------------------------------------------------------
+// deposit_to_reserve     { account_id, amount, token_id }
+// deposit                - same as above
+// withdraw_started       - same as above
+// withdraw_failed        - same as above
+// withdraw_succeeded     - same as above
+// increase_collateral    - same as above
+// decrease_collateral    - same as above
+// borrow                 - same as above
+// repay                  - same as above
+// liquidate              { account_id, liquidation_account_id, collateral_sum, repaid_sum }
+// force_close            { liquidation_account_id, collateral_sum, repaid_sum }
+// booster_stake          { account_id, booster_amount, duration, x_booster_amount, total_booster_amount, total_x_booster_amount }
+// booster_unstake        { account_id, total_booster_amount, total_x_booster_amount }
+// ------------------------------------------------------------------
 
 export function handleDeposit(
 	data: TypedMap<string, JSONValue>, 
@@ -83,8 +82,14 @@ export function handleDeposit(
 	}
 	
 	let market = getOrCreateMarket(token_id.toString());
+	let dailySnapshot = getOrCreateMarketDailySnapshot(market, receipt);
+	let hourlySnapshot = getOrCreateMarketHourlySnapshot(market, receipt);
+	let usageDailySnapshot = getOrCreateUsageMetricsDailySnapshot(receipt);
+	let usageHourlySnapshot = getOrCreateUsageMetricsHourlySnapshot(receipt);
+	let financialDailySnapshot = getOrCreateFinancialDailySnapshot(receipt);
 	let account = getOrCreateAccount(account_id.toString());
 	let position = getOrCreatePosition(account_id.toString(), token_id.toString(), "LENDER");
+	let positionSnapshot = getOrCreatePositionSnapshot(position, receipt);
 	let token = getOrCreateToken(token_id.toString());
 
 	deposit.account = account.id;
@@ -94,14 +99,27 @@ export function handleDeposit(
 	deposit.position = position.id;
 
 	deposit.amountUSD = deposit.amount
-		.toBigDecimal()
-		.div(
+		.divDecimal(
 			BigInt.fromI32(10)
 				.pow((token.decimals + token.extraDecimals) as u8)
 				.toBigDecimal()
 		)
 		.times(token.lastPriceUSD!);
 
+		
+	// usage metrics
+	if(position._last_active_timestamp.lt(usageDailySnapshot.timestamp)){
+		usageDailySnapshot.dailyActiveDepositors += 1;
+	}
+	if(account._last_active_timestamp.lt(usageDailySnapshot.timestamp)){
+		usageDailySnapshot.dailyActiveUsers += 1;
+		usageHourlySnapshot.hourlyActiveUsers += 1;
+	}
+	usageDailySnapshot.dailyDepositCount += 1;
+	usageDailySnapshot.dailyTransactionCount += 1;
+	usageHourlySnapshot.hourlyDepositCount += 1;
+	usageHourlySnapshot.hourlyTransactionCount += 1;
+		
 	// update position
 	if (position.balance.isZero()) {
 		account.positionCount += 1;
@@ -112,13 +130,17 @@ export function handleDeposit(
 		market.openPositionCount += 1;
 
 		position.hashOpened = receipt.outcome.id.toBase58();
-		position.timestampOpened = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000);
+		position.timestampOpened = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000000);
 		position.blockNumberOpened = BigInt.fromU64(receipt.block.header.height);
 	}
 	position.depositCount += 1;
 	position.balance = position.balance.plus(deposit.amount);
+	position._last_active_timestamp = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000000);
+	
 	// update account
-	account.depositCount = account.depositCount + 1;
+	account.depositCount += 1;
+	account._last_active_timestamp = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000000);
+
 	// deposit amount
 	market.outputTokenSupply = market.outputTokenSupply.plus(amount_to_shares(deposit.amount, market.outputTokenSupply, market.inputTokenBalance));
 	market.inputTokenBalance = market.inputTokenBalance.plus(deposit.amount);
@@ -126,12 +148,27 @@ export function handleDeposit(
 	// historical
 	market._totalDepositedHistory = market._totalDepositedHistory.plus(deposit.amount);
 
-	updateMarket(market, receipt);
+	// snapshot
+	dailySnapshot.dailyDepositUSD = dailySnapshot.dailyDepositUSD.plus(deposit.amountUSD);
+	hourlySnapshot.hourlyDepositUSD = hourlySnapshot.hourlyDepositUSD.plus(deposit.amountUSD);
+	financialDailySnapshot.dailyDepositUSD = financialDailySnapshot.dailyDepositUSD.plus(deposit.amountUSD);
+
+	positionSnapshot.logIndex = logIndex as i32;
+
+	updateMarket(market, dailySnapshot, hourlySnapshot, financialDailySnapshot, receipt);
 	updatePosition(position, market);
+
+	positionSnapshot.save();
+	financialDailySnapshot.save();
+	usageDailySnapshot.save();
+	usageHourlySnapshot.save();
+	dailySnapshot.save();
+	hourlySnapshot.save();
     market.save()
 	account.save();
 	deposit.save();
 	position.save();
+
 	updateProtocol();
 }
 
@@ -167,12 +204,18 @@ export function handleWithdraw(
 	}
 
 	let market = getOrCreateMarket(token_id.toString());
+	let dailySnapshot = getOrCreateMarketDailySnapshot(market, receipt);
+	let hourlySnapshot = getOrCreateMarketHourlySnapshot(market, receipt);
+	let usageDailySnapshot = getOrCreateUsageMetricsDailySnapshot(receipt);
+	let usageHourlySnapshot = getOrCreateUsageMetricsHourlySnapshot(receipt);
+	let financialDailySnapshot = getOrCreateFinancialDailySnapshot(receipt);
 	let account = getOrCreateAccount(account_id.toString());
 	let position = getOrCreatePosition(
 		account_id.toString(),
 		token_id.toString(),
 		"LENDER"
 	);
+	let positionSnapshot = getOrCreatePositionSnapshot(position, receipt);
 
 	let token = getOrCreateToken(token_id.toString());
 	withdraw.account = account.id;
@@ -182,13 +225,22 @@ export function handleWithdraw(
 	withdraw.position = position.id;
 
 	withdraw.amountUSD = withdraw.amount
-		.toBigDecimal()
-		.div(
+		.divDecimal(
 			BigInt.fromI32(10)
 				.pow((token.decimals + token.extraDecimals) as u8)
 				.toBigDecimal()
 		)
 		.times(token.lastPriceUSD!);
+
+	// usage metrics
+	if(account._last_active_timestamp.lt(usageDailySnapshot.timestamp)){
+		usageDailySnapshot.dailyActiveUsers += 1;
+		usageHourlySnapshot.hourlyActiveUsers += 1;
+	}
+	usageDailySnapshot.dailyWithdrawCount += 1;
+	usageDailySnapshot.dailyTransactionCount += 1;
+	usageHourlySnapshot.hourlyWithdrawCount += 1;
+	usageHourlySnapshot.hourlyTransactionCount += 1;
 
 	// update position
 	position.balance = position.balance.minus(withdraw.amount);
@@ -204,7 +256,7 @@ export function handleWithdraw(
 		market.lendingPositionCount -= 1;
 
 		position.hashClosed = receipt.outcome.id.toBase58();
-		position.timestampClosed = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000);
+		position.timestampClosed = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000000);
 		position.blockNumberClosed = BigInt.fromU64(receipt.block.header.height);
 	}
 
@@ -214,12 +266,27 @@ export function handleWithdraw(
 	market.outputTokenSupply = market.outputTokenSupply.minus(amount_to_shares(withdraw.amount, market.outputTokenSupply, market.inputTokenBalance));
 	market.inputTokenBalance = market.inputTokenBalance.minus(withdraw.amount);
 
-	updateMarket(market, receipt);
+	// snapshot
+	dailySnapshot.dailyWithdrawUSD = dailySnapshot.dailyWithdrawUSD.plus(withdraw.amountUSD);
+	hourlySnapshot.hourlyWithdrawUSD = hourlySnapshot.hourlyWithdrawUSD.plus(withdraw.amountUSD);
+	financialDailySnapshot.dailyWithdrawUSD = financialDailySnapshot.dailyWithdrawUSD.plus(withdraw.amountUSD);
+
+	positionSnapshot.logIndex = logIndex as i32;
+
+	updateMarket(market, dailySnapshot, hourlySnapshot, financialDailySnapshot, receipt);
 	updatePosition(position, market);
+
+	positionSnapshot.save();
+	financialDailySnapshot.save();
+	dailySnapshot.save();
+	hourlySnapshot.save();
+	usageDailySnapshot.save();
+	usageHourlySnapshot.save();
     market.save()
 	account.save();
 	withdraw.save();
 	position.save();
+
 	updateProtocol();
 }
 
@@ -255,12 +322,18 @@ export function handleBorrow(
 	}
 
 	let market = getOrCreateMarket(token_id.toString());
+	let dailySnapshot = getOrCreateMarketDailySnapshot(market, receipt);
+	let hourlySnapshot = getOrCreateMarketHourlySnapshot(market, receipt);
+	let usageDailySnapshot = getOrCreateUsageMetricsDailySnapshot(receipt);
+	let usageHourlySnapshot = getOrCreateUsageMetricsHourlySnapshot(receipt);
+	let financialDailySnapshot = getOrCreateFinancialDailySnapshot(receipt);
 	let account = getOrCreateAccount(account_id.toString());
 	let position = getOrCreatePosition(
 		account_id.toString(),
 		token_id.toString(),
 		"BORROWER"
 	);
+	let positionSnapshot = getOrCreatePositionSnapshot(position, receipt);
 
 	let token = getOrCreateToken(token_id.toString());
 	borrow.account = account.id;
@@ -270,13 +343,24 @@ export function handleBorrow(
 	borrow.position = position.id;
 
 	borrow.amountUSD = borrow.amount
-		.toBigDecimal()
-		.div(
+		.divDecimal(
 			BigInt.fromI32(10)
 				.pow((token.decimals + token.extraDecimals) as u8)
 				.toBigDecimal()
 		)
 		.times(token.lastPriceUSD!);
+	
+	if(position._last_active_timestamp.lt(usageDailySnapshot.timestamp)){
+		usageDailySnapshot.dailyActiveBorrowers += 1;
+	}
+	if(account._last_active_timestamp.lt(usageDailySnapshot.timestamp)){
+		usageDailySnapshot.dailyActiveUsers += 1;
+		usageHourlySnapshot.hourlyActiveUsers += 1;
+	}
+	usageDailySnapshot.dailyBorrowCount += 1;
+	usageDailySnapshot.dailyTransactionCount += 1;
+	usageHourlySnapshot.hourlyBorrowCount += 1;
+	usageHourlySnapshot.hourlyTransactionCount += 1;
 
 	// open position if balance is zero
 	if (position.balance.isZero()) {
@@ -288,7 +372,7 @@ export function handleBorrow(
 		market.borrowingPositionCount += 1;
 		
 		position.hashOpened = receipt.outcome.id.toBase58();
-		position.timestampOpened = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000);
+		position.timestampOpened = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000000);
 		position.blockNumberOpened = BigInt.fromU64(receipt.block.header.height);
 	}
 	position.balance = position.balance.plus(borrow.amount);
@@ -301,12 +385,27 @@ export function handleBorrow(
 	market.outputTokenSupply = market.outputTokenSupply.plus(amount_to_shares(borrow.amount, market.outputTokenSupply, market.inputTokenBalance));
 	market.inputTokenBalance = market.inputTokenBalance.plus(borrow.amount);
 
-	updateMarket(market, receipt);
+	// snapshot
+	dailySnapshot.dailyBorrowUSD = dailySnapshot.dailyBorrowUSD.plus(borrow.amountUSD);
+	hourlySnapshot.hourlyBorrowUSD = hourlySnapshot.hourlyBorrowUSD.plus(borrow.amountUSD);
+	financialDailySnapshot.dailyBorrowUSD = financialDailySnapshot.dailyBorrowUSD.plus(borrow.amountUSD);
+
+	positionSnapshot.logIndex = logIndex as i32;
+
+	updateMarket(market, dailySnapshot, hourlySnapshot, financialDailySnapshot, receipt);
 	updatePosition(position, market);
+
+	positionSnapshot.save();
+	financialDailySnapshot.save();
+	usageDailySnapshot.save();
+	usageHourlySnapshot.save();
+	hourlySnapshot.save()
+	dailySnapshot.save();
     market.save()
 	account.save();
 	borrow.save();
 	position.save();
+
 	updateProtocol();
 }
 
@@ -343,12 +442,18 @@ export function handleRepayment(
 	}
 
 	let market = getOrCreateMarket(token_id.toString());
+	let dailySnapshot = getOrCreateMarketDailySnapshot(market, receipt);
+	let hourlySnapshot = getOrCreateMarketHourlySnapshot(market, receipt);
+	let usageDailySnapshot = getOrCreateUsageMetricsDailySnapshot(receipt);
+	let usageHourlySnapshot = getOrCreateUsageMetricsHourlySnapshot(receipt);
+	let financialDailySnapshot = getOrCreateFinancialDailySnapshot(receipt);
 	let account = getOrCreateAccount(account_id.toString());
 	let position = getOrCreatePosition(
 		account_id.toString(),
 		token_id.toString(),
 		"BORROWER"
 	);
+	let positionSnapshot = getOrCreatePositionSnapshot(position, receipt);
 
 	let token = getOrCreateToken(token_id.toString());
 	repay.market = market.id;
@@ -357,14 +462,21 @@ export function handleRepayment(
 	repay.asset = token.id;
 	repay.position = position.id;
 	repay.amountUSD = repay.amount
-		.toBigDecimal()
-		.div(
-			BigInt.fromI32(10)
-				.pow((token.decimals + token.extraDecimals) as u8)
-				.toBigDecimal()
-		)
-		.times(token.lastPriceUSD!);
+	.divDecimal(
+		BigInt.fromI32(10)
+			.pow((token.decimals + token.extraDecimals) as u8)
+			.toBigDecimal()
+	)
+	.times(token.lastPriceUSD!);
 
+	if(account._last_active_timestamp.lt(usageDailySnapshot.timestamp)){
+		usageDailySnapshot.dailyActiveUsers += 1;
+		usageHourlySnapshot.hourlyActiveUsers += 1;
+	}
+	usageDailySnapshot.dailyRepayCount += 1;
+	usageDailySnapshot.dailyTransactionCount += 1;
+	usageHourlySnapshot.hourlyRepayCount += 1;
+	usageHourlySnapshot.hourlyTransactionCount += 1;
 
 	position.balance = position.balance.minus(repay.amount);
 	if (position.balance.isZero()) {
@@ -376,7 +488,7 @@ export function handleRepayment(
 		market.borrowingPositionCount -= 1;
 
 		position.hashClosed = receipt.outcome.id.toBase58();
-		position.timestampClosed = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000);
+		position.timestampClosed = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000000);
 		position.blockNumberClosed = BigInt.fromU64(receipt.block.header.height);
 	}
 
@@ -389,11 +501,26 @@ export function handleRepayment(
 	market.outputTokenSupply = market.outputTokenSupply.minus(amount_to_shares(repay.amount, market.outputTokenSupply, market.inputTokenBalance));
 	market.inputTokenBalance = market.inputTokenBalance.minus(repay.amount);
 
-	updateMarket(market, receipt);
+	// snapshot
+	dailySnapshot.dailyRepayUSD = dailySnapshot.dailyRepayUSD.plus(repay.amountUSD);
+	hourlySnapshot.hourlyRepayUSD = hourlySnapshot.hourlyRepayUSD.plus(repay.amountUSD);
+	financialDailySnapshot.dailyRepayUSD = financialDailySnapshot.dailyRepayUSD.plus(repay.amountUSD);
+
+	positionSnapshot.logIndex = logIndex as i32;
+
+	updateMarket(market, dailySnapshot, hourlySnapshot, financialDailySnapshot, receipt);
 	updatePosition(position, market);
+
+	positionSnapshot.save();
+	financialDailySnapshot.save();
+	hourlySnapshot.save()
+	dailySnapshot.save();
+	usageDailySnapshot.save();
+	usageHourlySnapshot.save();
     market.save()
 	account.save();
 	repay.save();
 	position.save();
+
 	updateProtocol();
 }

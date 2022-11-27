@@ -43,10 +43,10 @@ export function handleNewAsset(
 	market.createdBlockNumber = BigInt.fromU64(receipt.block.header.height);
 	market.createdTimestamp = BigInt.fromU64(
 		receipt.block.header.timestampNanosec
-	).div(BigInt.fromI32(1000000));
+	).div(BigInt.fromI32(1000000000));
 
-	market._last_update_timestamp = BigInt.fromI32(
-		(receipt.block.header.timestampNanosec / (1e6 as u64)) as i32
+	market._last_update_timestamp = BigInt.fromU64(
+		receipt.block.header.timestampNanosec / 1000000000
 	);
 
 	/* -------------------------------------------------------------------------- */
@@ -195,7 +195,7 @@ export function handleUpdateAsset(
 
 	market._last_update_timestamp = BigInt.fromU64(
 		receipt.block.header.timestampNanosec
-	).div(BigInt.fromI32(1000000));
+	).div(BigInt.fromI32(1000000000));
 
 	/* -------------------------------------------------------------------------- */
 	/*                                reserve_ratio                               */

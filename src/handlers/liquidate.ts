@@ -12,8 +12,8 @@ import { getOrCreateAccount } from '../helpers/account';
 import { updatePosition } from '../update/position';
 import { getOrCreatePosition } from '../helpers/position';
 
-import { getOrCreateBorrow, getOrCreateDeposit, getOrCreateLiquidation, getOrCreateRepayment, getOrCreateWithdrawal,  } from '../helpers/actions';
-import { getOrCreateMarket } from '../helpers/market';
+import { getOrCreateLiquidation  } from '../helpers/actions';
+import { getOrCreateMarket, getOrCreateMarketDailySnapshot, getOrCreateMarketHourlySnapshot } from '../helpers/market';
 import { getOrCreateToken } from '../helpers/token';
 
 import { updateMarket } from '../update/market';
@@ -100,8 +100,8 @@ export function handleLiquidate(
     // finding token_in, token_in_amount, token_out and token_out_amount
     // TOKEN_IN: borrowed token
     // TOKEN_OUT: collateral token
-    let token_in: string|undefined, token_out: string|undefined;
-    let token_in_amount: string|undefined, token_out_amount: string|undefined;
+    let token_in: string|null = null, token_out: string|null = null;
+    let token_in_amount: string|null = null, token_out_amount: string|null = null;
 	if (args) {
 		let msg = args.get('msg');
 		if (!msg) {
@@ -182,22 +182,31 @@ export function handleLiquidate(
 
     if(token_in && token_out && token_in_amount && token_out_amount) {
         let repaidMarket = getOrCreateMarket(token_in);
+		let dailySnapshot = getOrCreateMarketDailySnapshot(repaidMarket, receipt);
+		let hourlySnapshot = getOrCreateMarketHourlySnapshot(repaidMarket, receipt);
         let collateralMarket = getOrCreateMarket(token_out);
-
-        repaidMarket.cumulativeLiquidateUSD = repaidMarket.cumulativeLiquidateUSD.plus(repaid_sum_value);
-        repaidMarket._totalBorrowed = repaidMarket._totalBorrowed.minus(BigInt.fromString(token_in_amount));
-
+		
         liq.asset = repaidMarket.id;
         liq.market = collateralMarket.id;
         liq.amount = BigInt.fromString(token_out_amount);
         liq.position = getOrCreatePosition(
-            liquidation_account_id.toString(),
+			liquidation_account_id.toString(),
             token_in,
             "BORROWER"
-        ).id;
+		).id;
+			
+		repaidMarket.cumulativeLiquidateUSD = repaidMarket.cumulativeLiquidateUSD.plus(repaid_sum_value);
+		repaidMarket._totalBorrowed = repaidMarket._totalBorrowed.minus(BigInt.fromString(token_in_amount));
+
+		// ? Should we update the cumulativeLiquidateUSD in both collateral and borrowed market?
+		// ? Should we count liquidation as repayment?
+		dailySnapshot.cumulativeLiquidateUSD = dailySnapshot.cumulativeLiquidateUSD.plus(repaid_sum_value);
+		hourlySnapshot.cumulativeLiquidateUSD = hourlySnapshot.cumulativeLiquidateUSD.plus(repaid_sum_value);
 
         // TODO - remove deposit and borrow from liquidatee account
-
+		
+		dailySnapshot.save()
+		hourlySnapshot.save()
         repaidMarket.save();
         collateralMarket.save();
     } else {

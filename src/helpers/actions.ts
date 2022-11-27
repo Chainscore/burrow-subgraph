@@ -23,7 +23,7 @@ export function getOrCreateDeposit(
 		d.blockNumber = BigInt.fromI32(receipt.block.header.height as i32);
 		d.timestamp = BigInt.fromString(
 			receipt.block.header.timestampNanosec.toString()
-		).div(BigInt.fromString("1000000"));
+		).div(BigInt.fromString("1000000000"));
 		d.account = getOrCreateAccount(ADDRESS_ZERO).id;
 		d.market = "";
 		d.position = "";
@@ -48,7 +48,7 @@ export function getOrCreateWithdrawal(
 		w.blockNumber = BigInt.fromI32(receipt.block.header.height as i32);
 		w.timestamp = BigInt.fromString(
 			receipt.block.header.timestampNanosec.toString()
-		).div(BigInt.fromString("1000000"));
+		).div(BigInt.fromString("1000000000"));
 		w.account = getOrCreateAccount(ADDRESS_ZERO).id;
 		w.market = "";
 		w.position = "";
@@ -73,7 +73,7 @@ export function getOrCreateBorrow(
 		b.blockNumber = BigInt.fromI32(receipt.block.header.height as i32);
 		b.timestamp = BigInt.fromString(
 			receipt.block.header.timestampNanosec.toString()
-		).div(BigInt.fromString("1000000"));
+		).div(BigInt.fromString("1000000000"));
 		b.account = getOrCreateAccount(ADDRESS_ZERO).id;
 		b.market = "";
 		b.position = "";
@@ -98,7 +98,7 @@ export function getOrCreateRepayment(
 		r.blockNumber = BigInt.fromI32(receipt.block.header.height as i32);
 		r.timestamp = BigInt.fromString(
 			receipt.block.header.timestampNanosec.toString()
-		).div(BigInt.fromString("1000000"));
+		).div(BigInt.fromString("1000000000"));
 		r.account = getOrCreateAccount(ADDRESS_ZERO).id;
 		r.market = "";
 		r.position = "";

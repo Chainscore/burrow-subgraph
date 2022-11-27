@@ -64,7 +64,7 @@ export function getRate(market: Market): BigDecimal {
 	return rate;
 }
 
-export function updateApr(market: Market): void {
+export function updateApr(market: Market, receipt: near.ReceiptWithOutcome): void {
 	let rate = getRate(market);
 	if (rate.equals(BD_ONE)) return;
 
@@ -95,4 +95,15 @@ export function updateApr(market: Market): void {
 	let borrow_rate = getOrCreateBorrowRate(market);
 	borrow_rate.rate = borrow_apr.times(BD("100"));
 	borrow_rate.save();
+
+	/* -------------------------------------------------------------------------- */
+	/*                               Daily Snapshot                               */
+	/* -------------------------------------------------------------------------- */
+	let supplyRateToday = getOrCreateSupplyRate(market, receipt);
+	supplyRateToday.rate = supply_apr.times(BD("100"));
+	supplyRateToday.save();
+
+	let borrowRateToday = getOrCreateBorrowRate(market, receipt);
+	borrowRateToday.rate = borrow_rate.rate
+	borrowRateToday.save();
 }
