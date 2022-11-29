@@ -41,7 +41,10 @@ export function getOrCreateMarket(id: string): Market {
 
 		// reward token
 		r.rewardTokens = new Array<string>();
-		
+		r._reward_remaining_amounts = new Array<BigInt>();
+		r.rewardTokenEmissionsAmount = new Array<BigInt>();
+		r.rewardTokenEmissionsUSD = new Array<BigDecimal>();
+
 		// token balances
 		r.inputTokenBalance = BI_ZERO;
 		r.inputTokenPriceUSD = BD_ZERO;
@@ -130,8 +133,8 @@ export function getOrCreateMarketDailySnapshot(
 		snapshot.outputTokenSupply = market.outputTokenSupply
 		snapshot.outputTokenPriceUSD = market.outputTokenPriceUSD
 		snapshot.exchangeRate = market.exchangeRate
-		snapshot.rewardTokenEmissionsAmount = []
-		snapshot.rewardTokenEmissionsUSD = []
+		snapshot.rewardTokenEmissionsAmount = market.rewardTokenEmissionsAmount
+		snapshot.rewardTokenEmissionsUSD = market.rewardTokenEmissionsUSD
 
 		let previousDayId = (receipt.block.header.timestampNanosec / 86400000000000 - 1).toString()
 		let previousId = market.id.concat("-").concat(previousDayId);
@@ -150,6 +153,8 @@ export function getOrCreateMarketDailySnapshot(
 			previousSnapshot.outputTokenSupply = market.outputTokenSupply
 			previousSnapshot.outputTokenPriceUSD = market.outputTokenPriceUSD
 			previousSnapshot.exchangeRate = market.exchangeRate
+			previousSnapshot.rewardTokenEmissionsAmount = market.rewardTokenEmissionsAmount
+			previousSnapshot.rewardTokenEmissionsUSD = market.rewardTokenEmissionsUSD
 			previousSnapshot.save();
 		}
 	}
@@ -209,8 +214,8 @@ export function getOrCreateMarketHourlySnapshot(
 		snapshot.outputTokenSupply = market.outputTokenSupply
 		snapshot.outputTokenPriceUSD = market.outputTokenPriceUSD
 		snapshot.exchangeRate = market.exchangeRate
-		snapshot.rewardTokenEmissionsAmount = []
-		snapshot.rewardTokenEmissionsUSD = []
+		snapshot.rewardTokenEmissionsAmount = market.rewardTokenEmissionsAmount
+		snapshot.rewardTokenEmissionsUSD = market.rewardTokenEmissionsUSD
 
 		let previousHourId = (receipt.block.header.timestampNanosec / 3600000000000 - 1).toString()
 		let previousId = market.id.concat("-").concat(previousHourId);
@@ -229,6 +234,8 @@ export function getOrCreateMarketHourlySnapshot(
 			previousSnapshot.outputTokenSupply = market.outputTokenSupply
 			previousSnapshot.outputTokenPriceUSD = market.outputTokenPriceUSD
 			previousSnapshot.exchangeRate = market.exchangeRate
+			previousSnapshot.rewardTokenEmissionsAmount = market.rewardTokenEmissionsAmount
+			previousSnapshot.rewardTokenEmissionsUSD = market.rewardTokenEmissionsUSD
 			previousSnapshot.save();
 		}
 	}

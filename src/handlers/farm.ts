@@ -1,6 +1,7 @@
 import { JSONValue, JSONValueKind, log, near, TypedMap, BigInt, BigDecimal } from '@graphprotocol/graph-ts';
 import { getOrCreateMarket } from "../helpers/market";
 import { getOrCreateRewardToken, getOrCreateToken } from '../helpers/token';
+import { BD_ONE, BD_ZERO } from '../utils/const';
 
 /**
  * {
@@ -30,10 +31,10 @@ export function handleAddAssetFarmReward(
 	}
     let farm_id_obj = farm_id.toObject();
     let farm_id_asset = farm_id_obj.get('Supplied');
-    let farmType = 'Supplied';
+    let farmType = 'DEPOSIT';
     if (!farm_id_asset) {
         farm_id_asset = farm_id_obj.get('Borrowed');
-        farmType = 'Borrowed';
+        farmType = 'BORROW';
         if(!farm_id_asset) {
             log.warning("handleAddAssetFarmReward() :: farm_id_asset not found {}", [args]);
             return;
@@ -79,27 +80,38 @@ export function handleAddAssetFarmReward(
         reward_token_index = reward_tokens.length - 1;
     }
     
-    // _reward_remaining_amounts
-    if(!market._reward_remaining_amounts){
-        market._reward_remaining_amounts = new Array<BigInt>();
-    }
-    if(!market._reward_remaining_amounts[reward_token_index]) {
-        market._reward_remaining_amounts[reward_token_index] = BigInt.fromString(reward_amount.toString());
+    // add reward_amount to _reward_remaining_amounts
+    let _reward_remaining_amounts = market._reward_remaining_amounts;
+    if(_reward_remaining_amounts.length <= reward_token_index)  {
+        _reward_remaining_amounts.push(BigInt.fromString(reward_amount.toString()));
     } else {
-        market._reward_remaining_amounts[reward_token_index] = market._reward_remaining_amounts[reward_token_index].plus(BigInt.fromString(reward_amount.toString()));
+        _reward_remaining_amounts[reward_token_index] = market._reward_remaining_amounts[reward_token_index].plus(BigInt.fromString(reward_amount.toString()));
     }
+    market._reward_remaining_amounts = _reward_remaining_amounts;
     
     // rewardTokenEmissionsAmount
-    if(!market.rewardTokenEmissionsAmount) {
-        market.rewardTokenEmissionsAmount = new Array<BigInt>();
+    let rewardTokenEmissionsAmount = market.rewardTokenEmissionsAmount;
+    if(rewardTokenEmissionsAmount!.length <= reward_token_index) {
+        rewardTokenEmissionsAmount!.push(BigInt.fromString(new_reward_per_day.toString()));
+    } else {
+        rewardTokenEmissionsAmount![reward_token_index] = BigInt.fromString(new_reward_per_day.toString());
     }
-    market.rewardTokenEmissionsAmount![reward_token_index] = BigInt.fromString(new_reward_per_day.toString());
-   
+    market.rewardTokenEmissionsAmount = rewardTokenEmissionsAmount;
+
     // rewardTokenEmissionsUSD
-    if(!market.rewardTokenEmissionsUSD) {
-        market.rewardTokenEmissionsUSD = new Array<BigDecimal>();
+    let rewardTokenEmissionsUSD = market.rewardTokenEmissionsUSD;
+    let token = getOrCreateToken(rewardToken.token)
+    let price = token.lastPriceUSD!;
+    if(price.equals(BD_ZERO)){
+        price = BigDecimal.fromString("0.01");
     }
-    market.rewardTokenEmissionsUSD![reward_token_index] = BigDecimal.fromString(new_reward_per_day.toString()).div(getOrCreateToken(rewardToken.token).lastPriceUSD!);
+    let rewardUSD = BigDecimal.fromString(new_reward_per_day.toString()).div(BigInt.fromString('10').pow((token.decimals + token.extraDecimals) as u8).toBigDecimal()).div(price);
+    if(rewardTokenEmissionsUSD!.length <= reward_token_index) {
+        rewardTokenEmissionsUSD!.push(rewardUSD);
+    } else {
+        rewardTokenEmissionsUSD![reward_token_index] = rewardUSD
+    }
+    market.rewardTokenEmissionsUSD = rewardTokenEmissionsUSD;
 
     market.save();
 }
