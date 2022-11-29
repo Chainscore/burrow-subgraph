@@ -6,18 +6,13 @@ import { getOrCreateBorrowRate } from "../helpers/rates";
 import { getRate } from "./rates";
 import { bigDecimalExponential } from "./math";
 
-const BI_BD = (n: BigInt): BigDecimal => BigDecimal.fromString(n.toString());
 const BD = (n: string): BigDecimal => BigDecimal.fromString(n);
 
 export function compound(market: Market, receipt: near.ReceiptWithOutcome): Market {
-	let time_diff_ms = BigInt.fromU64((receipt.block.header.timestampNanosec / (1e6 as u64))).minus(market._last_update_timestamp);
+	let time_diff_ms = BigInt.fromU64((receipt.block.header.timestampNanosec / 1000000)).minus(market._last_update_timestamp);
 	
 	if (time_diff_ms.gt(BI_ZERO)) {
-		// update timestamp
-		market._last_update_timestamp = market._last_update_timestamp.plus(
-			time_diff_ms
-		);
-
+		
 		let rate = getRate(market);
 		let interestScaled = bigDecimalExponential(
 			rate.minus(BD_ONE),
@@ -25,32 +20,25 @@ export function compound(market: Market, receipt: near.ReceiptWithOutcome): Mark
 		);
 
 		let interest = interestScaled
-			.times(BI_BD(market._totalBorrowed))
-			.minus(BI_BD(market._totalBorrowed))
+			.times(market._totalBorrowed.toBigDecimal())
+			.minus(market._totalBorrowed.toBigDecimal())
 			.truncate(0);
 
-		if (interestScaled.gt(BD("1.01"))) {
-			log.warning(
-				"compound() :: Interest scaled too big {} time {} apr {}",
-				[
-					interestScaled.toString(),
-					time_diff_ms.toString(),
-					getOrCreateBorrowRate(market).rate.toString(),
-				]
-			);
-			return market;
-		} else if (interestScaled.equals(BD_ONE)) {
-			log.warning(
-				"compound() :: Interest scaled is zero {} time {} apr {}",
+		if (interestScaled.gt(BD("2"))) {
+			log.critical(
+				"compound() :: Interest scaled too big {} time {} rate {} utilization {}",
 				[
 					interestScaled.toString(),
 					time_diff_ms.toString(),
 					rate.toString(),
+					market._utilization.toString()
 				]
 			);
 			return market;
+		} else if (interestScaled.equals(BD_ONE)) {
+			return market;
 		} else if (interestScaled.lt(BD_ZERO)) {
-			log.warning(
+			log.critical(
 				"compound() :: Interest scaled is negative {} time {} apr {} {} {}",
 				[
 					interestScaled.toString(),
@@ -65,22 +53,19 @@ export function compound(market: Market, receipt: near.ReceiptWithOutcome): Mark
 
 		// TODO: Split interest based on ratio between reserved and supplied?
 		let reserved = interest
-			.times(market._reserveRatio.divDecimal(BD("10000")))
+			.times(market._reserveRatio.toBigDecimal()).div(BD("10000"))
 			.truncate(0);
 
-		if (market.inputTokenBalance.ge(BI_ZERO)) {
-			market._totalReserved = market._totalReserved.plus(BigInt.fromString(reserved.toString()));
-			market.inputTokenBalance = market.inputTokenBalance.plus(
-				BigInt.fromString(interest.minus(reserved).toString())
-			);
-		} else {
-			market._totalReserved = market._totalReserved.plus(
-				BigInt.fromString(interest.toString())
-			);
-		}
+		market._totalReserved = market._totalReserved.plus(BigInt.fromString(reserved.toString()));
+		market.inputTokenBalance = market.inputTokenBalance.plus(
+			BigInt.fromString(interest.minus(reserved).toString())
+		);
 		market._totalBorrowed = market._totalBorrowed.plus(
 			BigInt.fromString(interest.toString())
 		);
+
+		// update timestamp
+		market._last_update_timestamp = market._last_update_timestamp.plus(time_diff_ms);
 	}
 	return market;
 }

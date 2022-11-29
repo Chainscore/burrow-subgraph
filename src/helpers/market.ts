@@ -38,6 +38,10 @@ export function getOrCreateMarket(id: string): Market {
 		r.totalBorrowBalanceUSD = BD_ZERO;
 		r.cumulativeBorrowUSD = BD_ZERO;
 		r.cumulativeLiquidateUSD = BD_ZERO;
+
+		// reward token
+		r.rewardTokens = new Array<string>();
+		
 		// token balances
 		r.inputTokenBalance = BI_ZERO;
 		r.inputTokenPriceUSD = BD_ZERO;

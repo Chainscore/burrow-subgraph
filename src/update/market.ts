@@ -41,7 +41,7 @@ export function updateMarket(
 	market.totalValueLockedUSD = market.totalDepositBalanceUSD;
 
 	// cumulativeSupplySideRevenueUSD, cumulativeTotalRevenueUSD
-	let newRevenue = market._totalReserved
+	let newRevenue = market._totalReserved.minus(market._added_to_reserve)
 		.divDecimal(BigInt.fromI32(10).pow((token.decimals + token.extraDecimals) as u8).toBigDecimal()
 		).times(market.inputTokenPriceUSD)
 		.minus(market.cumulativeSupplySideRevenueUSD)
@@ -83,7 +83,5 @@ export function updateMarket(
 		market.inputTokenPriceUSD
 	);
 
-	market._last_update_timestamp = BigInt.fromU64(
-		receipt.block.header.timestampNanosec
-	).div(BigInt.fromI32(1000000000));
+	market._last_update_timestamp = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000);
 }

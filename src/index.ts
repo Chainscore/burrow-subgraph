@@ -13,12 +13,13 @@ import {
 
 import {Event, Method} from "../generated/schema";
 
-import { handleDeposit, handleWithdraw, handleBorrow, handleRepayment } from './handlers/actions';
-import { handleNew } from './utils/config';
+import { handleDeposit, handleDepositToReserve, handleWithdraw, handleBorrow, handleRepayment } from './handlers/actions';
+import { handleNew } from './handlers/config';
 import { handleNewAsset, handleUpdateAsset } from './handlers/market';
 
 import { handleOracleCall } from "./handlers/oracle_calls";
 import { handleLiquidate } from "./handlers/liquidate";
+import { handleAddAssetFarmReward } from "./handlers/farm";
 
 export function handleReceipt(receipt: near.ReceiptWithOutcome): void {
 	const actions = receipt.receipt.actions;
@@ -88,7 +89,7 @@ function handleEvent(
 	args?: TypedMap<string, JSONValue>
 ): void {
 	// log.info("Event from method {}: {}:: With data: {}", [method ?? "", event, outcomeLog])
-    let _event = new Event("EVENT:" + receipt.receipt.id.toHex());
+    let _event = new Event("EVENT:" + receipt.receipt.id.toBase58());
 	_event.name = event
     _event.args = outcomeLog;
 	_event.timestamp = BigInt.fromString(receipt.block.header.timestampNanosec.toString())
@@ -99,6 +100,9 @@ function handleEvent(
 	// }
 	if(event == "deposit"){
 		handleDeposit(data, receipt, logIndex, method, args)
+	}
+	else if(event == 'deposit_to_reserve'){
+		handleDepositToReserve(data, receipt, logIndex, method, args)
 	}
 	else if(event == "withdraw_succeeded"){
 		handleWithdraw(data, receipt, logIndex, method, args)
@@ -121,13 +125,13 @@ function handleMethod(
 	receipt: near.ReceiptWithOutcome
 ): void {
 	// log.info("Method {}: args {}", [method, args])
-	let _method = new Method("METHOD:" + receipt.receipt.id.toHex());
+	let _method = new Method("METHOD:" + receipt.receipt.id.toBase58());
 	_method.name = method
     _method.args = args;
 	_method.timestamp = BigInt.fromString(receipt.block.header.timestampNanosec.toString())
     _method.save();
 
-	if(method == "new") {
+	if(method == "new" || method == "update_config") {
 		handleNew(method, args, data, receipt)
 	} 
 	else if(method == "oracle_on_call") {
@@ -138,5 +142,8 @@ function handleMethod(
 	} 
 	else if(method == "update_asset") {
 		handleUpdateAsset(method, args, data, receipt)
+	}
+	else if(method == "add_asset_farm_reward") {
+		handleAddAssetFarmReward(method, args, data, receipt)
 	}
 }

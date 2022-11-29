@@ -45,9 +45,7 @@ export function handleNewAsset(
 		receipt.block.header.timestampNanosec
 	).div(BigInt.fromI32(1000000000));
 
-	market._last_update_timestamp = BigInt.fromU64(
-		receipt.block.header.timestampNanosec / 1000000000
-	);
+	market._last_update_timestamp = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000);
 
 	/* -------------------------------------------------------------------------- */
 	/*                                reserve_ratio                               */
@@ -193,9 +191,7 @@ export function handleUpdateAsset(
 	}
 	let assetConfig = assetConfigObj.toObject();
 
-	market._last_update_timestamp = BigInt.fromU64(
-		receipt.block.header.timestampNanosec
-	).div(BigInt.fromI32(1000000000));
+	market._last_update_timestamp = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000);
 
 	/* -------------------------------------------------------------------------- */
 	/*                                reserve_ratio                               */

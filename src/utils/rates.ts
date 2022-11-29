@@ -4,7 +4,6 @@ import { BD_ONE, BD_ZERO, BI_ZERO } from "./const";
 import { getOrCreateBorrowRate, getOrCreateSupplyRate } from "../helpers/rates";
 import { bigDecimalExponential } from "./math";
 
-const BI_BD = (n: BigInt): BigDecimal => BigDecimal.fromString(n.toString());
 const BD = (n: string): BigDecimal => BigDecimal.fromString(n);
 
 
@@ -12,28 +11,16 @@ export function getRate(market: Market): BigDecimal {
 	if (market.inputTokenBalance.equals(BI_ZERO)) {
 		return BD_ONE;
 	}
-	let pos = BI_BD(market._totalBorrowed).div(
-		BI_BD(market._totalReserved.plus(market.inputTokenBalance))
-	);
-
-	if(pos.gt(BD_ONE)){
-		log.warning("getRate() :: pos > 1 {} :: Borrowed {} Deposited {} Reserve {}", [
-			pos.toString(),
-			market._totalBorrowed.toString(),
-			market.inputTokenBalance.toString(),
-			market._totalReserved.toString(),
-		]);
-		pos = BD_ONE;
-	}
+	let pos = market._totalBorrowed.divDecimal(market._totalReserved.plus(market.inputTokenBalance).toBigDecimal());
 
 	market._utilization = pos;
-	let target = BI_BD(market._target_utilization).div(BD("10000"));
+	let target = market._target_utilization.toBigDecimal().div(BD("10000"));
 	let rate = BD_ZERO;
 
 	if (pos.le(target)) {
 		// BigDecimal::one() + pos * (BigDecimal::from(self.target_utilization_rate) - BigDecimal::one())/ target_utilization
 		
-        let highPos = BI_BD(market._target_utilization_rate)
+        let highPos = market._target_utilization_rate.toBigDecimal()
 			.div(BD("1000000000000000000000000000"))
 			.minus(BD_ONE)
 			.div(target);
@@ -42,14 +29,14 @@ export function getRate(market: Market): BigDecimal {
 
 		// BigDecimal::from(self.target_utilization_rate) + (pos - target_utilization) * (BigDecimal::from(self.max_utilization_rate) - BigDecimal::from(self.target_utilization_rate)) / BigDecimal::from_ratio(MAX_POS - self.target_utilization)
 
-		rate = BI_BD(market._target_utilization_rate)
+		rate = market._target_utilization_rate.toBigDecimal()
 			.div(BD("1000000000000000000000000000"))
 			.plus(
 				pos
 					.minus(target)
 					.times(
-						BI_BD(market._max_utilization_rate)
-							.minus(BI_BD(market._target_utilization_rate))
+						market._max_utilization_rate
+							.minus(market._target_utilization_rate).toBigDecimal()
 							.div(BD("1000000000000000000000000000"))
 					)
 					.div(BD_ONE.minus(target))
@@ -57,7 +44,7 @@ export function getRate(market: Market): BigDecimal {
 	}
 
 	if (rate.lt(BD_ONE) || rate.gt(BD("1.1"))) {
-		log.warning("getRate() :: RATE TOO BIG :: {}", [rate.toString()]);
+		log.critical("getRate() :: RATE TOO BIG/LOW :: {}", [rate.toString()]);
 		rate = BD_ONE;
 	}
 
@@ -72,14 +59,17 @@ export function updateApr(market: Market, receipt: near.ReceiptWithOutcome): voi
 		rate.minus(BD_ONE),
 		BD("31536000000")
 	).minus(BD_ONE);
-	let annualBorrowInterest = BD(market._totalBorrowed.toString()).times(
+
+	let annualBorrowInterest = market._totalBorrowed.toBigDecimal().times(
 		borrow_apr
 	);
+
 	let annualSupplyInterest = annualBorrowInterest.times(
-		BD_ONE.minus(BI_BD(market._reserveRatio).div(BD("10000")))
+		BD_ONE.minus(market._reserveRatio.toBigDecimal().div(BD("10000")))
 	);
+
 	let supply_apr = annualSupplyInterest.div(
-		BD(market.inputTokenBalance.toString())
+		market.inputTokenBalance.toBigDecimal()
 	);
 
 	/* -------------------------------------------------------------------------- */

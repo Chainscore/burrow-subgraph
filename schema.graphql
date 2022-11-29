@@ -35,14 +35,6 @@ enum ProtocolType {
   # Will add more
 }
 
-enum PositionSide {
-  " Position opened as a lender "
-  LENDER
-
-  " Position opened as a borrower "
-  BORROWER
-}
-
 type Token @entity {
   " Smart contract address of the token "
   id: ID!
@@ -66,6 +58,26 @@ type Token @entity {
   lastPriceBlockNumber: BigInt
 }
 
+enum RewardTokenType {
+  " For reward tokens awarded to LPs/lenders "
+  DEPOSIT
+
+  " For reward tokens awarded to borrowers "
+  BORROW
+}
+
+type RewardToken @entity {
+  " { Reward token type }-{ Smart contract address of the reward token } "
+  id: ID!
+
+  " Reference to the actual token "
+  token: Token!
+
+  " The type of the reward token "
+  type: RewardTokenType!
+}
+
+
 enum LendingType {
   " Collateralized Debt Position (CDP) protocols have singular isolated positions created by users. We aggregate them to give a single view of a market "
   CDP
@@ -81,7 +93,6 @@ enum RiskType {
   " Isolated risk means each users position in a market or CDP is isolated for risk of liquidation "
   ISOLATED
 }
-
 
 enum InterestRateSide {
   " Interest rate accrued by lenders "
@@ -100,6 +111,14 @@ enum InterestRateType {
 
   " Fixed interest rate (e.g. Notional) "
   FIXED
+}
+
+enum PositionSide {
+  " Position opened as a lender "
+  LENDER
+
+  " Position opened as a borrower "
+  BORROWER
 }
 
 # Most markets only have a single interest rate given a specific type.
@@ -179,7 +198,16 @@ interface Protocol {
   totalPoolCount: Int!
 
   ##### Snapshots #####
+  " Daily usage metrics for this protocol "
+  dailyUsageMetrics: [UsageMetricsDailySnapshot!]!
+    @derivedFrom(field: "protocol")
 
+  " Hourly usage metrics for this protocol "
+  hourlyUsageMetrics: [UsageMetricsHourlySnapshot!]!
+    @derivedFrom(field: "protocol")
+
+  " Daily financial metrics for this protocol "
+  financialMetrics: [FinancialsDailySnapshot!]! @derivedFrom(field: "protocol")
 }
 
 type LendingProtocol implements Protocol @entity {
@@ -286,19 +314,19 @@ type LendingProtocol implements Protocol @entity {
     @derivedFrom(field: "protocol")
 
   # " Daily financial metrics for this protocol "
-  # financialMetrics: [FinancialsDailySnapshot!]! @derivedFrom(field: "protocol")
+  financialMetrics: [FinancialsDailySnapshot!]! @derivedFrom(field: "protocol")
 
   ##### Markets #####
 
   " All markets that belong to this protocol "
-  _marketIds: [String!]!
   markets: [Market!]! @derivedFrom(field: "protocol")
 
-  ##### Metadata #####
+  " Metadata "
   _oracle: String!
   _maxAssets: Int!
   _booster: String!
   _boosterMultiplier: BigInt!
+  _marketIds: [String!]!
   _owner: String!
 }
 
@@ -520,7 +548,7 @@ type Market @entity {
   outputToken: Token
 
   # " Aditional tokens that are given as reward for position in a protocol, usually in liquidity mining programs. e.g. SUSHI in the Onsen program, MATIC for Aave Polygon "
-  # rewardTokens: [RewardToken!]
+  rewardTokens: [RewardToken!]
 
   ##### Quantitative Data #####
 
@@ -606,10 +634,10 @@ type Market @entity {
   ##### Snapshots #####
 
   # " Market daily snapshots "
-  # dailySnapshots: [MarketDailySnapshot!]! @derivedFrom(field: "market")
+  dailySnapshots: [MarketDailySnapshot!]! @derivedFrom(field: "market")
 
   # " Market hourly snapshots "
-  # hourlySnapshots: [MarketHourlySnapshot!]! @derivedFrom(field: "market")
+  hourlySnapshots: [MarketHourlySnapshot!]! @derivedFrom(field: "market")
 
   ##### Events #####
 
@@ -633,12 +661,15 @@ type Market @entity {
   _totalDepositedHistory: BigInt!
   _totalWithrawnHistory: BigInt!
   _totalReserved: BigInt!
+  _added_to_reserve: BigInt!
 
   _last_update_timestamp: BigInt!
   _utilization: BigDecimal!
   _totalBorrowed: BigInt!
   _totalBorrowedHistory: BigInt!
   _totalRepaidHistory: BigInt! 
+
+  _reward_remaining_amounts: [BigInt!]!
 
   _reserveRatio: BigInt!
   _target_utilization: BigInt!

@@ -1,9 +1,7 @@
 import { BigInt, log, BigDecimal, near } from "@graphprotocol/graph-ts";
-import { Token, Market } from "../../generated/schema";
-import { compound } from "../utils/compound";
+import { Token, Market, RewardToken } from "../../generated/schema";
 import { assets, BI_ZERO, BD_ZERO, ADDRESS_ZERO } from "../utils/const";
-import { updateApr } from "../utils/rates";
-import { getOrCreateProtocol } from "./protocol";
+
 
 export function getOrCreateToken(id: string): Token {
 	let token = Token.load(id);
@@ -28,4 +26,17 @@ export function getOrCreateToken(id: string): Token {
 		token.save();
 	}
 	return token;
+}
+
+export function getOrCreateRewardToken(tokenAddress: string, type: string): RewardToken {
+	let id = type.concat("-").concat(tokenAddress);
+	let rewardToken = RewardToken.load(id);
+	if (!rewardToken) {
+		rewardToken = new RewardToken(id);
+		let token = getOrCreateToken(tokenAddress);
+		rewardToken.token = token.id;
+		rewardToken.type = type;
+		rewardToken.save();
+	}
+	return rewardToken as RewardToken;
 }

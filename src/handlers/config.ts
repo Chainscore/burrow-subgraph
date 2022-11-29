@@ -12,7 +12,7 @@ import {
 import {
 	getOrCreateToken,
 } from '../helpers/token';
-import { assets } from './const';
+import { assets } from '../utils/const';
 import { getOrCreateProtocol } from '../helpers/protocol';
 
 export function handleNew(

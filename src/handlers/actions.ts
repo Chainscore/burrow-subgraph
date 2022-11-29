@@ -20,6 +20,7 @@ import { updateMarket } from '../update/market';
 import { amount_to_shares } from '../utils/shares';
 import { updateProtocol } from '../update/protocol';
 import { getOrCreateUsageMetricsDailySnapshot, getOrCreateUsageMetricsHourlySnapshot, getOrCreateFinancialDailySnapshot } from '../helpers/protocol';
+import { parse0 } from '../utils/parser';
 
 // ------------------------------------------------------------------
 // ----------------------------- Events -----------------------------
@@ -54,46 +55,23 @@ export function handleDeposit(
 		receipt
 	);
 	deposit.logIndex = logIndex as i32;
-	/* -------------------------------------------------------------------------- */
-	/*                                   Account                                  */
-	/* -------------------------------------------------------------------------- */
-	let account_id = data.get('account_id');
-	if (!account_id) {
-		log.info('{} data not found', ['account_id']);
-		return;
-	}
-
-	/* -------------------------------------------------------------------------- */
-	/*                                   Amount                                   */
-	/* -------------------------------------------------------------------------- */
-	let amount = data.get('amount');
-	if (!amount) {
-		log.info('{} data not found', ['amount']);
-		return;
-	}
-
-	/* -------------------------------------------------------------------------- */
-	/*                                  Token ID                                  */
-	/* -------------------------------------------------------------------------- */
-	let token_id = data.get('token_id');
-	if (!token_id) {
-		log.info('{} data not found', ['token_id']);
-		return;
-	}
+	let parsedData = parse0(data);
+	let account_id = parsedData[0];
+	let amount = parsedData[1];
+	let token_id = parsedData[2];
 	
-	let market = getOrCreateMarket(token_id.toString());
+	let market = getOrCreateMarket(token_id);
 	let dailySnapshot = getOrCreateMarketDailySnapshot(market, receipt);
 	let hourlySnapshot = getOrCreateMarketHourlySnapshot(market, receipt);
 	let usageDailySnapshot = getOrCreateUsageMetricsDailySnapshot(receipt);
 	let usageHourlySnapshot = getOrCreateUsageMetricsHourlySnapshot(receipt);
 	let financialDailySnapshot = getOrCreateFinancialDailySnapshot(receipt);
-	let account = getOrCreateAccount(account_id.toString());
-	let position = getOrCreatePosition(account_id.toString(), token_id.toString(), "LENDER");
-	let positionSnapshot = getOrCreatePositionSnapshot(position, receipt);
-	let token = getOrCreateToken(token_id.toString());
+	let account = getOrCreateAccount(account_id);
+	let position = getOrCreatePosition(account_id, token_id, "LENDER");
+	let token = getOrCreateToken(token_id);
 
 	deposit.account = account.id;
-	deposit.amount = BigInt.fromString(amount.toString());
+	deposit.amount = BigInt.fromString(amount);
 	deposit.asset = token.id;
 	deposit.market = market.id;
 	deposit.position = position.id;
@@ -153,6 +131,7 @@ export function handleDeposit(
 	hourlySnapshot.hourlyDepositUSD = hourlySnapshot.hourlyDepositUSD.plus(deposit.amountUSD);
 	financialDailySnapshot.dailyDepositUSD = financialDailySnapshot.dailyDepositUSD.plus(deposit.amountUSD);
 
+	let positionSnapshot = getOrCreatePositionSnapshot(position, receipt);
 	positionSnapshot.logIndex = logIndex as i32;
 
 	updateMarket(market, dailySnapshot, hourlySnapshot, financialDailySnapshot, receipt);
@@ -170,6 +149,26 @@ export function handleDeposit(
 	position.save();
 
 	updateProtocol();
+}
+
+export function handleDepositToReserve(
+	data: TypedMap<string, JSONValue>,
+	receipt: near.ReceiptWithOutcome,
+	logIndex: number,
+	method?: string,
+	args?: TypedMap<string, JSONValue>
+): void {
+	let parsedData = parse0(data);
+	let account_id = parsedData[0];
+	let amount = parsedData[1];
+	let token_id = parsedData[2];
+
+	let market = getOrCreateMarket(token_id);
+
+	market._totalReserved = market._totalReserved.plus(BigInt.fromString(amount));
+	market._added_to_reserve = market._added_to_reserve.plus(BigInt.fromString(amount));
+
+	market.save();
 }
 
 export function handleWithdraw(
@@ -215,7 +214,6 @@ export function handleWithdraw(
 		token_id.toString(),
 		"LENDER"
 	);
-	let positionSnapshot = getOrCreatePositionSnapshot(position, receipt);
 
 	let token = getOrCreateToken(token_id.toString());
 	withdraw.account = account.id;
@@ -271,6 +269,7 @@ export function handleWithdraw(
 	hourlySnapshot.hourlyWithdrawUSD = hourlySnapshot.hourlyWithdrawUSD.plus(withdraw.amountUSD);
 	financialDailySnapshot.dailyWithdrawUSD = financialDailySnapshot.dailyWithdrawUSD.plus(withdraw.amountUSD);
 
+	let positionSnapshot = getOrCreatePositionSnapshot(position, receipt);
 	positionSnapshot.logIndex = logIndex as i32;
 
 	updateMarket(market, dailySnapshot, hourlySnapshot, financialDailySnapshot, receipt);
@@ -333,7 +332,6 @@ export function handleBorrow(
 		token_id.toString(),
 		"BORROWER"
 	);
-	let positionSnapshot = getOrCreatePositionSnapshot(position, receipt);
 
 	let token = getOrCreateToken(token_id.toString());
 	borrow.account = account.id;
@@ -390,6 +388,7 @@ export function handleBorrow(
 	hourlySnapshot.hourlyBorrowUSD = hourlySnapshot.hourlyBorrowUSD.plus(borrow.amountUSD);
 	financialDailySnapshot.dailyBorrowUSD = financialDailySnapshot.dailyBorrowUSD.plus(borrow.amountUSD);
 
+	let positionSnapshot = getOrCreatePositionSnapshot(position, receipt);
 	positionSnapshot.logIndex = logIndex as i32;
 
 	updateMarket(market, dailySnapshot, hourlySnapshot, financialDailySnapshot, receipt);
@@ -453,7 +452,6 @@ export function handleRepayment(
 		token_id.toString(),
 		"BORROWER"
 	);
-	let positionSnapshot = getOrCreatePositionSnapshot(position, receipt);
 
 	let token = getOrCreateToken(token_id.toString());
 	repay.market = market.id;
@@ -506,6 +504,7 @@ export function handleRepayment(
 	hourlySnapshot.hourlyRepayUSD = hourlySnapshot.hourlyRepayUSD.plus(repay.amountUSD);
 	financialDailySnapshot.dailyRepayUSD = financialDailySnapshot.dailyRepayUSD.plus(repay.amountUSD);
 
+	let positionSnapshot = getOrCreatePositionSnapshot(position, receipt);
 	positionSnapshot.logIndex = logIndex as i32;
 
 	updateMarket(market, dailySnapshot, hourlySnapshot, financialDailySnapshot, receipt);
