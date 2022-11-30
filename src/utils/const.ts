@@ -127,3 +127,11 @@ assets.set("v2-nearx.stader-labs.near", new TokenMetadata(
     18,
     0
 ))
+
+// wrapped near
+assets.set("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2.factory.bridge.near", new TokenMetadata(
+    "Wrapped Ether",
+    "WETH",
+    18,
+    0
+))

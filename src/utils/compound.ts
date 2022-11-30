@@ -63,8 +63,9 @@ export function compound(
 		_reward_remaining_amounts[i] = _reward_remaining_amounts[i].minus(rewardTokenEmittedEveryMs.times(time_diff_ms))
 
 		if(_reward_remaining_amounts[i].lt(rewardTokenEmissionsAmount[i])){
-			rewardTokenEmissionsAmount[i] = BI_ZERO
-			rewardTokenEmissionsUSD[i] = BD_ZERO
+			rewardTokenEmissionsAmount[i] = BI_ZERO;
+			rewardTokenEmissionsUSD[i] = BD_ZERO;
+			_reward_remaining_amounts[i] = BI_ZERO;
 		}
 	}
 	market._reward_remaining_amounts = _reward_remaining_amounts

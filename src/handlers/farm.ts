@@ -103,9 +103,9 @@ export function handleAddAssetFarmReward(
     let token = getOrCreateToken(rewardToken.token)
     let price = token.lastPriceUSD!;
     if(price.equals(BD_ZERO)){
-        price = BigDecimal.fromString("0.01");
+        price = BigDecimal.fromString("0.001");
     }
-    let rewardUSD = BigDecimal.fromString(new_reward_per_day.toString()).div(BigInt.fromString('10').pow((token.decimals + token.extraDecimals) as u8).toBigDecimal()).div(price);
+    let rewardUSD = BigDecimal.fromString(new_reward_per_day.toString()).div(BigInt.fromString('10').pow((token.decimals + token.extraDecimals) as u8).toBigDecimal()).times(price);
     if(rewardTokenEmissionsUSD!.length <= reward_token_index) {
         rewardTokenEmissionsUSD!.push(rewardUSD);
     } else {

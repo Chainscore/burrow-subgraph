@@ -197,6 +197,9 @@ export function handleLiquidate(
 			
 		repaidMarket.cumulativeLiquidateUSD = repaidMarket.cumulativeLiquidateUSD.plus(repaid_sum_value);
 		repaidMarket._totalBorrowed = repaidMarket._totalBorrowed.minus(BigInt.fromString(token_in_amount));
+		repaidMarket.inputTokenBalance = repaidMarket.inputTokenBalance.plus(BigInt.fromString(token_in_amount));
+
+		// collateralMarket._
 
 		// ? Should we update the cumulativeLiquidateUSD in both collateral and borrowed market?
 		// ? Should we count liquidation as repayment?
@@ -218,3 +221,4 @@ export function handleLiquidate(
     protocol.save();
 	updateProtocol();
 }
+
