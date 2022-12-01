@@ -20,6 +20,8 @@ import { updateMarket } from '../update/market';
 import { amount_to_shares } from '../utils/shares';
 import { updateProtocol } from '../update/protocol';
 import { getOrCreateProtocol } from '../helpers/protocol';
+import { Position } from '../../generated/schema';
+import { BI_ZERO } from '../utils/const';
 
 // { account_id, liquidation_account_id, collateral_sum, repaid_sum }
 export function handleLiquidate(
@@ -230,5 +232,51 @@ export function handleForceClose(
 	args?: TypedMap<string, JSONValue>
 ): void {
 	let protocol = getOrCreateProtocol();
-	let liq = getOrCreateLiquidation(receipt.receipt.id.toBase58(), receipt);
+
+	// let liquidator = getOrCreateAccount(receipt.receipt.signerId);
+	// liquidator.liquidateCount += 1;
+	// liquidator.save();
+
+	// { liquidation_account_id, collateral_sum, repaid_sum }
+	let liquidation_account_id = data.get('liquidation_account_id');
+	if (!liquidation_account_id) {
+		log.info('{} data not found', ['liquidation_account_id']);
+		return;
+	}
+	// let liquidatee = getOrCreateAccount(liquidation_account_id.toString());
+    // if(liquidatee.liquidationCount == 0){
+    //     protocol.cumulativeUniqueLiquidatees = protocol.cumulativeUniqueLiquidatees + 1
+    // }
+	// liquidatee.liquidationCount += 1;
+	// liquidatee.save();
+
+	// let all position of liquidatee
+	let repaid_sum_calc = BigDecimal.fromString('0');
+	let collateral_sum_calc = BigDecimal.fromString('0');
+	let markets = protocol._marketIds;
+	for(let i=0; i<markets.length; i++){
+		let market = getOrCreateMarket(markets[i]);
+		let borrow_position = Position.load(markets[i].concat("-").concat(liquidation_account_id.toString()).concat("-BORROWER"));
+		let supply_position = Position.load(markets[i].concat("-").concat(liquidation_account_id.toString()).concat("-BORROWER"));
+		if(borrow_position){
+			if(borrow_position.balance.gt(BI_ZERO)){
+				repaid_sum_calc = repaid_sum_calc.plus(borrow_position.balance.toBigDecimal().times(market.inputTokenPriceUSD));
+				borrow_position.balance = BI_ZERO;
+				market._totalBorrowed = market._totalBorrowed.minus(borrow_position.balance);
+				market.inputTokenBalance = market.inputTokenBalance.minus(borrow_position.balance);
+			}
+		}
+		if(supply_position){
+			if(supply_position.balance.gt(BI_ZERO)){
+				collateral_sum_calc = collateral_sum_calc.plus(supply_position.balance.toBigDecimal().times(market.inputTokenPriceUSD));
+				supply_position.balance = BI_ZERO;
+			}
+		}
+	}
+	
+	let collateral_sum = data.get('collateral_sum');
+	let repaid_sum = data.get('repaid_sum');
+
+	log.warning('FC::collateral_sum_calc: {} collateral_sum {}', [collateral_sum_calc.toString(), collateral_sum!.toString()]);
+	log.warning('FC::repaid_sum_calc: {} repaid_sum {}', [repaid_sum_calc.toString(), repaid_sum!.toString()]);
 }

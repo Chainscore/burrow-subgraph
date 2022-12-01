@@ -18,7 +18,7 @@ import { handleNew } from './handlers/config';
 import { handleNewAsset, handleUpdateAsset } from './handlers/market';
 
 import { handleOracleCall } from "./handlers/oracle_calls";
-import { handleLiquidate } from "./handlers/liquidate";
+import { handleLiquidate, handleForceClose } from './handlers/liquidate';
 import { handleAddAssetFarmReward } from "./handlers/farm";
 
 export function handleReceipt(receipt: near.ReceiptWithOutcome): void {
@@ -99,6 +99,9 @@ function handleEvent(
 	}
 	else if(event == "liquidate"){
 		handleLiquidate(data, receipt, logIndex, method, args)
+	} 
+	else if(event == "force_close"){
+		handleForceClose(data, receipt, logIndex, method, args)
 	}
 }
 
