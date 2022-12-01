@@ -8,8 +8,9 @@ import {
 } from "@graphprotocol/graph-ts";
 import { getOrCreateMarket } from "../helpers/market";
 import { getOrCreateToken } from "../helpers/token";
-import { assets } from "../utils/const";
+import { assets, BIGDECIMAL_100, BIGDECIMAL_TWO } from '../utils/const';
 import { getOrCreateProtocol } from "../helpers/protocol";
+import { BigDecimal } from '@graphprotocol/graph-ts';
 
 export function handleNewAsset(
 	method: string,
@@ -99,7 +100,9 @@ export function handleNewAsset(
 		log.info("NEW_ASSET::Volatility ratio not found {}", [args]);
 		return;
 	}
-	market._volatility_ratio = BigInt.fromI64(volatility_ratio.toI64());
+	market.maximumLTV = BigDecimal.fromString(volatility_ratio.toI64().toString()).div(BIGDECIMAL_100);
+	market.liquidationThreshold = BigDecimal.fromString(volatility_ratio.toI64().toString()).div(BIGDECIMAL_100);
+	market.liquidationPenalty = BIGDECIMAL_100.minus(market.liquidationThreshold).div(BIGDECIMAL_TWO);
 
 	/* -------------------------------------------------------------------------- */
 	/*                              extra_decimals                                */

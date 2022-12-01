@@ -15,8 +15,7 @@ export const BIGDECIMAL_TWO = BD("2");
 export const BIGDECIMAL_THREE = BD("3");
 export const BIGDECIMAL_TWELVE = BD("12");
 export const BIGDECIMAL_SIX = BD("6");
-
-
+export const BIGDECIMAL_100 = BD("100");
 
 export const assets = new TypedMap<string, TokenMetadata>()
 
@@ -132,6 +131,38 @@ assets.set("v2-nearx.stader-labs.near", new TokenMetadata(
 assets.set("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2.factory.bridge.near", new TokenMetadata(
     "Wrapped Ether",
     "WETH",
+    18,
+    0
+))
+
+// chainlink 
+assets.set("514910771af9ca656af840dff83e8264ecf986ca.factory.bridge.near", new TokenMetadata(
+    "Chainlink",
+    "LINK",
+    18,
+    0
+))
+
+// ref
+assets.set("token.v2.ref-finance.near", new TokenMetadata(
+    "Ref Finance",
+    "REF",
+    18,
+    0
+))
+
+// skyward
+assets.set("token.skyward.near", new TokenMetadata(
+    "Skyward Finance",
+    "SKYWARD",
+    18,
+    0
+))
+
+// octopus
+assets.set("f5cfbc74057c610c8ef151a439252680ac68c6dc.factory.bridge.near", new TokenMetadata(
+    "Octopus",
+    "OCT",
     18,
     0
 ))
