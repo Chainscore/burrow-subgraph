@@ -241,21 +241,25 @@ export function handleWithdraw(
 	usageHourlySnapshot.hourlyTransactionCount += 1;
 
 	// update position
-	position.balance = position.balance.minus(withdraw.amount);
-	position.withdrawCount += 1;
-
-	// close if balance is zero
-	if (position.balance.isZero()) {
-		account.openPositionCount -= 1;
-		account.closedPositionCount += 1;
-
-		market.openPositionCount -= 1;
-		market.closedPositionCount += 1;
-		market.lendingPositionCount -= 1;
-
-		position.hashClosed = receipt.outcome.id.toBase58();
-		position.timestampClosed = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000000);
-		position.blockNumberClosed = BigInt.fromU64(receipt.block.header.height);
+	if(position.balance.lt(withdraw.amount)){
+		market._added_to_reserve = market._added_to_reserve.minus(position.balance);
+		market._totalReserved = market._totalReserved.minus(position.balance);
+	} else {
+		position.balance = position.balance.minus(withdraw.amount);
+		position.withdrawCount += 1;
+		// close if balance is zero
+		if (position.balance.isZero()) {
+			account.openPositionCount -= 1;
+			account.closedPositionCount += 1;
+	
+			market.openPositionCount -= 1;
+			market.closedPositionCount += 1;
+			market.lendingPositionCount -= 1;
+	
+			position.hashClosed = receipt.outcome.id.toBase58();
+			position.timestampClosed = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000000);
+			position.blockNumberClosed = BigInt.fromU64(receipt.block.header.height);
+		}
 	}
 
 	account.withdrawCount = account.withdrawCount + 1;
@@ -380,8 +384,8 @@ export function handleBorrow(
 	market._totalBorrowedHistory = market._totalBorrowedHistory.plus(borrow.amount);
 	
 	// borrowed amount gets withdrawn from the account => so we need to add that to deposits
-	market.outputTokenSupply = market.outputTokenSupply.plus(amount_to_shares(borrow.amount, market.outputTokenSupply, market.inputTokenBalance));
 	market.inputTokenBalance = market.inputTokenBalance.plus(borrow.amount);
+	market.outputTokenSupply = market.outputTokenSupply.plus(amount_to_shares(borrow.amount, market.outputTokenSupply, market.inputTokenBalance));
 
 	// snapshot
 	dailySnapshot.dailyBorrowUSD = dailySnapshot.dailyBorrowUSD.plus(borrow.amountUSD);

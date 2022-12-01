@@ -197,7 +197,7 @@ export function handleLiquidate(
 			
 		repaidMarket.cumulativeLiquidateUSD = repaidMarket.cumulativeLiquidateUSD.plus(repaid_sum_value);
 		repaidMarket._totalBorrowed = repaidMarket._totalBorrowed.minus(BigInt.fromString(token_in_amount));
-		repaidMarket.inputTokenBalance = repaidMarket.inputTokenBalance.plus(BigInt.fromString(token_in_amount));
+		repaidMarket.inputTokenBalance = repaidMarket.inputTokenBalance.minus(BigInt.fromString(token_in_amount));
 
 		// collateralMarket._
 
@@ -222,3 +222,13 @@ export function handleLiquidate(
 	updateProtocol();
 }
 
+export function handleForceClose(
+	data: TypedMap<string, JSONValue>,
+	receipt: near.ReceiptWithOutcome,
+	logIndex: number,
+	method?: string,
+	args?: TypedMap<string, JSONValue>
+): void {
+	let protocol = getOrCreateProtocol();
+	let liq = getOrCreateLiquidation(receipt.receipt.id.toBase58(), receipt);
+}
