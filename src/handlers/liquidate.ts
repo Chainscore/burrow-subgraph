@@ -19,7 +19,7 @@ import { getOrCreateToken } from '../helpers/token';
 import { updateMarket } from '../update/market';
 import { amount_to_shares } from '../utils/shares';
 import { updateProtocol } from '../update/protocol';
-import { getOrCreateProtocol } from '../helpers/protocol';
+import { getOrCreateProtocol, getOrCreateUsageMetricsDailySnapshot } from '../helpers/protocol';
 import { Position } from '../../generated/schema';
 import { BI_ZERO } from '../utils/const';
 
@@ -32,6 +32,8 @@ export function handleLiquidate(
 	args?: TypedMap<string, JSONValue>
 ): void {
     let protocol = getOrCreateProtocol();
+
+	let dailyUsage = getOrCreateUsageMetricsDailySnapshot(receipt);
 
 	let liq = getOrCreateLiquidation(
 		receipt.outcome.id
@@ -55,6 +57,9 @@ export function handleLiquidate(
     if(liquidator.liquidateCount == 0){
         protocol.cumulativeUniqueLiquidators = protocol.cumulativeUniqueLiquidators + 1
     }
+	if(liquidator._last_active_timestamp.lt(dailyUsage.timestamp)){
+		dailyUsage.dailyActiveLiquidators += 1;
+	}
 	liquidator.liquidateCount += 1;
 	liq.liquidator = liquidator.id;
 	liquidator.save();
@@ -71,6 +76,9 @@ export function handleLiquidate(
     if(liquidatee.liquidationCount == 0){
         protocol.cumulativeUniqueLiquidatees = protocol.cumulativeUniqueLiquidatees + 1
     }
+	if(liquidatee._last_active_timestamp.lt(dailyUsage.timestamp)){
+		dailyUsage.dailyActiveLiquidatees += 1;
+	}
 	liquidatee.liquidationCount += 1;
 	liq.liquidatee = liquidatee.id;
 	liquidatee.save();
@@ -194,7 +202,8 @@ export function handleLiquidate(
         liq.position = getOrCreatePosition(
 			liquidation_account_id.toString(),
             token_in,
-            "BORROWER"
+            "BORROWER",
+			receipt
 		).id;
 			
 		repaidMarket.cumulativeLiquidateUSD = repaidMarket.cumulativeLiquidateUSD.plus(repaid_sum_value);
@@ -206,12 +215,14 @@ export function handleLiquidate(
 		// ? Should we update the cumulativeLiquidateUSD in both collateral and borrowed market?
 		// ? Should we count liquidation as repayment?
 		dailySnapshot.cumulativeLiquidateUSD = dailySnapshot.cumulativeLiquidateUSD.plus(repaid_sum_value);
+		dailySnapshot.dailyLiquidateUSD = dailySnapshot.dailyLiquidateUSD.plus(repaid_sum_value);
 		hourlySnapshot.cumulativeLiquidateUSD = hourlySnapshot.cumulativeLiquidateUSD.plus(repaid_sum_value);
+		hourlySnapshot.hourlyLiquidateUSD = hourlySnapshot.hourlyLiquidateUSD.plus(repaid_sum_value);
 
         // TODO - remove deposit and borrow from liquidatee account
 		
-		dailySnapshot.save()
-		hourlySnapshot.save()
+		dailySnapshot.save();
+		hourlySnapshot.save();
         repaidMarket.save();
         collateralMarket.save();
     } else {

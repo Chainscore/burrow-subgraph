@@ -19,25 +19,26 @@ import { getOrCreateToken } from '../helpers/token';
 import { updateMarket } from '../update/market';
 import { amount_to_shares } from '../utils/shares';
 import { updateProtocol } from '../update/protocol';
-import { getOrCreateUsageMetricsDailySnapshot, getOrCreateUsageMetricsHourlySnapshot, getOrCreateFinancialDailySnapshot } from '../helpers/protocol';
+import { getOrCreateUsageMetricsDailySnapshot, getOrCreateUsageMetricsHourlySnapshot, getOrCreateFinancialDailySnapshot, getOrCreateProtocol } from '../helpers/protocol';
 import { parse0 } from '../utils/parser';
+import { BI_ZERO } from '../utils/const';
 
 // ------------------------------------------------------------------
 // ----------------------------- Events -----------------------------
 // ------------------------------------------------------------------
-// deposit_to_reserve     { account_id, amount, token_id }
-// deposit                - same as above
-// withdraw_started       - same as above
-// withdraw_failed        - same as above
-// withdraw_succeeded     - same as above
-// increase_collateral    - same as above
-// decrease_collateral    - same as above
-// borrow                 - same as above
-// repay                  - same as above
-// liquidate              { account_id, liquidation_account_id, collateral_sum, repaid_sum }
-// force_close            { liquidation_account_id, collateral_sum, repaid_sum }
-// booster_stake          { account_id, booster_amount, duration, x_booster_amount, total_booster_amount, total_x_booster_amount }
-// booster_unstake        { account_id, total_booster_amount, total_x_booster_amount }
+// deposit_to_reserve     { account_id, amount, token_id } ✅
+// deposit                - same as above ✅
+// withdraw_started       - same as above ❌
+// withdraw_failed        - same as above ❌
+// withdraw_succeeded     - same as above ✅
+// increase_collateral    - same as above ❌
+// decrease_collateral    - same as above ❌
+// borrow                 - same as above ✅
+// repay                  - same as above ✅
+// liquidate              { account_id, liquidation_account_id, collateral_sum, repaid_sum } ✅
+// force_close            { liquidation_account_id, collateral_sum, repaid_sum } ✅
+// booster_stake          { account_id, booster_amount, duration, x_booster_amount, total_booster_amount, total_x_booster_amount } ❌
+// booster_unstake        { account_id, total_booster_amount, total_x_booster_amount } ❌
 // ------------------------------------------------------------------
 
 export function handleDeposit(
@@ -61,13 +62,17 @@ export function handleDeposit(
 	let token_id = parsedData[2];
 	
 	let market = getOrCreateMarket(token_id);
+	let protocol = getOrCreateProtocol();
+
 	let dailySnapshot = getOrCreateMarketDailySnapshot(market, receipt);
 	let hourlySnapshot = getOrCreateMarketHourlySnapshot(market, receipt);
+
 	let usageDailySnapshot = getOrCreateUsageMetricsDailySnapshot(receipt);
 	let usageHourlySnapshot = getOrCreateUsageMetricsHourlySnapshot(receipt);
 	let financialDailySnapshot = getOrCreateFinancialDailySnapshot(receipt);
+
 	let account = getOrCreateAccount(account_id);
-	let position = getOrCreatePosition(account_id, token_id, "LENDER");
+	let position = getOrCreatePosition(account_id, token_id, "LENDER", receipt);
 	let token = getOrCreateToken(token_id);
 
 	deposit.account = account.id;
@@ -97,7 +102,7 @@ export function handleDeposit(
 	usageDailySnapshot.dailyTransactionCount += 1;
 	usageHourlySnapshot.hourlyDepositCount += 1;
 	usageHourlySnapshot.hourlyTransactionCount += 1;
-		
+	
 	// update position
 	if (position.balance.isZero()) {
 		account.positionCount += 1;
@@ -106,16 +111,15 @@ export function handleDeposit(
 		market.positionCount += 1;
 		market.lendingPositionCount += 1;
 		market.openPositionCount += 1;
-
-		position.hashOpened = receipt.outcome.id.toBase58();
-		position.timestampOpened = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000000);
-		position.blockNumberOpened = BigInt.fromU64(receipt.block.header.height);
 	}
 	position.depositCount += 1;
 	position.balance = position.balance.plus(deposit.amount);
 	position._last_active_timestamp = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000000);
 	
 	// update account
+	if(account.depositCount == 0){
+		protocol.cumulativeUniqueDepositors += 1;
+	}
 	account.depositCount += 1;
 	account._last_active_timestamp = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000000);
 
@@ -125,6 +129,7 @@ export function handleDeposit(
 	
 	// historical
 	market._totalDepositedHistory = market._totalDepositedHistory.plus(deposit.amount);
+	market.cumulativeDepositUSD = market.cumulativeDepositUSD.plus(deposit.amountUSD);
 
 	// snapshot
 	dailySnapshot.dailyDepositUSD = dailySnapshot.dailyDepositUSD.plus(deposit.amountUSD);
@@ -166,6 +171,7 @@ export function handleDepositToReserve(
 	let market = getOrCreateMarket(token_id);
 
 	market._totalReserved = market._totalReserved.plus(BigInt.fromString(amount));
+	// for revenue calculation
 	market._added_to_reserve = market._added_to_reserve.plus(BigInt.fromString(amount));
 
 	market.save();
@@ -212,7 +218,8 @@ export function handleWithdraw(
 	let position = getOrCreatePosition(
 		account_id.toString(),
 		token_id.toString(),
-		"LENDER"
+		"LENDER",
+		receipt
 	);
 
 	let token = getOrCreateToken(token_id.toString());
@@ -240,13 +247,14 @@ export function handleWithdraw(
 	usageHourlySnapshot.hourlyWithdrawCount += 1;
 	usageHourlySnapshot.hourlyTransactionCount += 1;
 
-	// update position
-	if(position.balance.lt(withdraw.amount)){
+	// withdrawal without deposit
+	if(market.inputTokenBalance.lt(withdraw.amount)){
 		market._added_to_reserve = market._added_to_reserve.minus(position.balance);
 		market._totalReserved = market._totalReserved.minus(position.balance);
 	} else {
 		position.balance = position.balance.minus(withdraw.amount);
 		position.withdrawCount += 1;
+
 		// close if balance is zero
 		if (position.balance.isZero()) {
 			account.openPositionCount -= 1;
@@ -325,6 +333,7 @@ export function handleBorrow(
 	}
 
 	let market = getOrCreateMarket(token_id.toString());
+	let protocol = getOrCreateProtocol();
 	let dailySnapshot = getOrCreateMarketDailySnapshot(market, receipt);
 	let hourlySnapshot = getOrCreateMarketHourlySnapshot(market, receipt);
 	let usageDailySnapshot = getOrCreateUsageMetricsDailySnapshot(receipt);
@@ -334,7 +343,8 @@ export function handleBorrow(
 	let position = getOrCreatePosition(
 		account_id.toString(),
 		token_id.toString(),
-		"BORROWER"
+		"BORROWER",
+		receipt
 	);
 
 	let token = getOrCreateToken(token_id.toString());
@@ -379,11 +389,17 @@ export function handleBorrow(
 	}
 	position.balance = position.balance.plus(borrow.amount);
 
+	if(account.borrowCount == 0){
+		protocol.cumulativeUniqueBorrowers += 1;
+	}
 	account.borrowCount += 1;
+	// asset.borrowed.deposit(borrowed_shares, amount);
 	market._totalBorrowed = market._totalBorrowed.plus(borrow.amount);
 	market._totalBorrowedHistory = market._totalBorrowedHistory.plus(borrow.amount);
+	market.cumulativeBorrowUSD = market.cumulativeBorrowUSD.plus(borrow.amountUSD);
 	
 	// borrowed amount gets withdrawn from the account => so we need to add that to deposits
+	// asset.supplied.deposit(supplied_shares, amount);
 	market.inputTokenBalance = market.inputTokenBalance.plus(borrow.amount);
 	market.outputTokenSupply = market.outputTokenSupply.plus(amount_to_shares(borrow.amount, market.outputTokenSupply, market.inputTokenBalance));
 
@@ -454,7 +470,8 @@ export function handleRepayment(
 	let position = getOrCreatePosition(
 		account_id.toString(),
 		token_id.toString(),
-		"BORROWER"
+		"BORROWER",
+		receipt
 	);
 
 	let token = getOrCreateToken(token_id.toString());
@@ -496,12 +513,14 @@ export function handleRepayment(
 
 	account.repayCount += 1;
 
-	market._totalRepaidHistory = market._totalRepaidHistory.plus(repay.amount);
+	// asset.borrowed.withdraw(borrowed_shares, amount);
 	market._totalBorrowed = market._totalBorrowed.minus(repay.amount);
+	market._totalRepaidHistory = market._totalRepaidHistory.plus(repay.amount);
 
 	// minus repay amount from total deposited => because user has to deposit first to repay loan
-	market.outputTokenSupply = market.outputTokenSupply.minus(amount_to_shares(repay.amount, market.outputTokenSupply, market.inputTokenBalance));
+	// asset.supplied.withdraw(supplied_shares, amount);
 	market.inputTokenBalance = market.inputTokenBalance.minus(repay.amount);
+	market.outputTokenSupply = market.outputTokenSupply.minus(amount_to_shares(repay.amount, market.outputTokenSupply, market.inputTokenBalance));
 
 	// snapshot
 	dailySnapshot.dailyRepayUSD = dailySnapshot.dailyRepayUSD.plus(repay.amountUSD);

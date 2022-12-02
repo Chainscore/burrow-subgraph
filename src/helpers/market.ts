@@ -135,28 +135,6 @@ export function getOrCreateMarketDailySnapshot(
 		snapshot.exchangeRate = market.exchangeRate
 		snapshot.rewardTokenEmissionsAmount = market.rewardTokenEmissionsAmount
 		snapshot.rewardTokenEmissionsUSD = market.rewardTokenEmissionsUSD
-
-		let previousDayId = (receipt.block.header.timestampNanosec / 86400000000000 - 1).toString()
-		let previousId = market.id.concat("-").concat(previousDayId);
-		let previousSnapshot = MarketDailySnapshot.load(previousId);
-		if(previousSnapshot){
-			previousSnapshot.cumulativeSupplySideRevenueUSD = market.cumulativeSupplySideRevenueUSD
-			previousSnapshot.cumulativeProtocolSideRevenueUSD = market.cumulativeProtocolSideRevenueUSD
-			previousSnapshot.cumulativeTotalRevenueUSD = market.cumulativeTotalRevenueUSD
-			previousSnapshot.totalDepositBalanceUSD = market.totalDepositBalanceUSD
-			previousSnapshot.cumulativeDepositUSD = market.cumulativeDepositUSD
-			previousSnapshot.totalBorrowBalanceUSD = market.totalBorrowBalanceUSD
-			previousSnapshot.cumulativeBorrowUSD = market.cumulativeBorrowUSD
-			previousSnapshot.cumulativeLiquidateUSD = market.cumulativeLiquidateUSD
-			previousSnapshot.inputTokenBalance = market.inputTokenBalance
-			previousSnapshot.inputTokenPriceUSD = market.inputTokenPriceUSD
-			previousSnapshot.outputTokenSupply = market.outputTokenSupply
-			previousSnapshot.outputTokenPriceUSD = market.outputTokenPriceUSD
-			previousSnapshot.exchangeRate = market.exchangeRate
-			previousSnapshot.rewardTokenEmissionsAmount = market.rewardTokenEmissionsAmount
-			previousSnapshot.rewardTokenEmissionsUSD = market.rewardTokenEmissionsUSD
-			previousSnapshot.save();
-		}
 	}
 	return snapshot as MarketDailySnapshot;
 }
@@ -216,28 +194,6 @@ export function getOrCreateMarketHourlySnapshot(
 		snapshot.exchangeRate = market.exchangeRate
 		snapshot.rewardTokenEmissionsAmount = market.rewardTokenEmissionsAmount
 		snapshot.rewardTokenEmissionsUSD = market.rewardTokenEmissionsUSD
-
-		let previousHourId = (receipt.block.header.timestampNanosec / 3600000000000 - 1).toString()
-		let previousId = market.id.concat("-").concat(previousHourId);
-		let previousSnapshot = MarketHourlySnapshot.load(previousId);
-		if(previousSnapshot){
-			previousSnapshot.cumulativeSupplySideRevenueUSD = market.cumulativeSupplySideRevenueUSD
-			previousSnapshot.cumulativeProtocolSideRevenueUSD = market.cumulativeProtocolSideRevenueUSD
-			previousSnapshot.cumulativeTotalRevenueUSD = market.cumulativeTotalRevenueUSD
-			previousSnapshot.totalDepositBalanceUSD = market.totalDepositBalanceUSD
-			previousSnapshot.cumulativeDepositUSD = market.cumulativeDepositUSD
-			previousSnapshot.totalBorrowBalanceUSD = market.totalBorrowBalanceUSD
-			previousSnapshot.cumulativeBorrowUSD = market.cumulativeBorrowUSD
-			previousSnapshot.cumulativeLiquidateUSD = market.cumulativeLiquidateUSD
-			previousSnapshot.inputTokenBalance = market.inputTokenBalance
-			previousSnapshot.inputTokenPriceUSD = market.inputTokenPriceUSD
-			previousSnapshot.outputTokenSupply = market.outputTokenSupply
-			previousSnapshot.outputTokenPriceUSD = market.outputTokenPriceUSD
-			previousSnapshot.exchangeRate = market.exchangeRate
-			previousSnapshot.rewardTokenEmissionsAmount = market.rewardTokenEmissionsAmount
-			previousSnapshot.rewardTokenEmissionsUSD = market.rewardTokenEmissionsUSD
-			previousSnapshot.save();
-		}
 	}
 	return snapshot as MarketHourlySnapshot;
 }

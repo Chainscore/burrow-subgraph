@@ -4,7 +4,7 @@ import { assets, BI_ZERO, BD_ZERO, ADDRESS_ZERO } from "../utils/const";
 import { getOrCreateAccount } from "./account";
 import { getOrCreateMarket } from "./market";
 
-export function getOrCreatePosition(account: string, market: string, side: string): Position {
+export function getOrCreatePosition(account: string, market: string, side: string, receipt: near.ReceiptWithOutcome): Position {
 	let id = account.concat("-").concat(market).concat("-").concat(side).concat('-0');
 	let r = Position.load(id);
 	if (!r) {

@@ -3,6 +3,7 @@ import { Token, Market, MarketDailySnapshot, MarketHourlySnapshot, FinancialsDai
 import { compound } from "../utils/compound";
 import { updateApr } from "../utils/rates";
 import { getOrCreateToken } from "../helpers/token";
+import { BD_ZERO } from "../utils/const";
 
 export function updateMarket(
 	market: Market,
@@ -41,10 +42,15 @@ export function updateMarket(
 	market.totalValueLockedUSD = market.totalDepositBalanceUSD;
 
 	// cumulativeSupplySideRevenueUSD, cumulativeTotalRevenueUSD
+	// newRevenue = actual_reserve - lastRevenue
 	let newRevenue = market._totalReserved.minus(market._added_to_reserve)
 		.divDecimal(BigInt.fromI32(10).pow((token.decimals + token.extraDecimals) as u8).toBigDecimal()
 		).times(market.inputTokenPriceUSD)
 		.minus(market.cumulativeSupplySideRevenueUSD)
+	if(newRevenue.lt(BD_ZERO)) {
+		newRevenue = BD_ZERO;
+		log.warning("revenue withdrawn: {}", [newRevenue.toString()]);
+	}
 
 	market.cumulativeSupplySideRevenueUSD = market.cumulativeSupplySideRevenueUSD.plus(newRevenue)
 	market.cumulativeTotalRevenueUSD = market.cumulativeTotalRevenueUSD.plus(newRevenue);

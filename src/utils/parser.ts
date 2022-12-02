@@ -6,7 +6,7 @@ export function parse0(data: TypedMap<string, JSONValue>): string[] {
 	/* -------------------------------------------------------------------------- */
 	let account_id = data.get('account_id');
 	if (!account_id) {
-		log.critical('parse0() :: account_id data not found :: data', []);
+		log.warning('parse0() :: account_id data not found :: data', []);
         throw new Error()
 	}
 
@@ -15,7 +15,7 @@ export function parse0(data: TypedMap<string, JSONValue>): string[] {
 	/* -------------------------------------------------------------------------- */
 	let amount = data.get('amount');
 	if (!amount) {
-		log.critical('parse0() :: account_id data not found :: data', []);
+		log.warning('parse0() :: account_id data not found :: data', []);
         throw new Error()
 	}
 
@@ -24,7 +24,7 @@ export function parse0(data: TypedMap<string, JSONValue>): string[] {
 	/* -------------------------------------------------------------------------- */
 	let token_id = data.get('token_id');
 	if (!token_id) {
-		log.critical('parse0() :: account_id data not found :: data', []);
+		log.warning('parse0() :: account_id data not found :: data', []);
         throw new Error()
 	}
 

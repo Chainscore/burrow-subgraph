@@ -19,16 +19,13 @@ export function getRate(market: Market): BigDecimal {
 
 	if (pos.le(target)) {
 		// BigDecimal::one() + pos * (BigDecimal::from(self.target_utilization_rate) - BigDecimal::one())/ target_utilization
-		
         let highPos = market._target_utilization_rate.toBigDecimal()
 			.div(BD("1000000000000000000000000000"))
 			.minus(BD_ONE)
 			.div(target);
 		rate = BD_ONE.plus(pos.times(highPos));
 	} else {
-
 		// BigDecimal::from(self.target_utilization_rate) + (pos - target_utilization) * (BigDecimal::from(self.max_utilization_rate) - BigDecimal::from(self.target_utilization_rate)) / BigDecimal::from_ratio(MAX_POS - self.target_utilization)
-
 		rate = market._target_utilization_rate.toBigDecimal()
 			.div(BD("1000000000000000000000000000"))
 			.plus(
@@ -44,7 +41,7 @@ export function getRate(market: Market): BigDecimal {
 	}
 
 	if (rate.lt(BD_ONE) || rate.gt(BD("1.1"))) {
-		log.critical("getRate() :: RATE TOO BIG/LOW :: {}", [rate.toString()]);
+		log.warning("getRate() :: RATE TOO BIG/LOW {} :: Market {} ::Collateral {} Borrowed {} Reserve {}", [rate.toString(), market.name!, market.inputTokenBalance.toString(), market._totalBorrowed.toString(), market._totalReserved.toString()]);
 		rate = BD_ONE;
 	}
 
