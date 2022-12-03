@@ -1,20 +1,21 @@
-import { dataSource, log, near, BigInt } from '@graphprotocol/graph-ts';
+import { dataSource, near, BigInt } from '@graphprotocol/graph-ts';
 import { LendingProtocol, UsageMetricsDailySnapshot, UsageMetricsHourlySnapshot, FinancialsDailySnapshot } from '../../generated/schema';
-import { BD_ZERO } from "../utils/const";
+import { BD_ZERO } from '../utils/const';
 
 export function getOrCreateProtocol(): LendingProtocol {
 	let protocol = LendingProtocol.load(dataSource.address().toString());
 	if (!protocol) {
 		protocol = new LendingProtocol(dataSource.address().toString());
-		protocol.name = "Burrow";
-		protocol.slug = "burrow";
-		protocol.schemaVersion = "2.0.1";
-		protocol.subgraphVersion = "1.0.0";
-		protocol.methodologyVersion = "1.0.0";
-		protocol.network = "NEAR_MAINNET";
-		protocol.type = "LENDING";
+		protocol.name = 'Burrow';
+		protocol.slug = 'burrow';
+		protocol.schemaVersion = '2.0.1';
+		protocol.subgraphVersion = '1.0.0';
+		protocol.methodologyVersion = '1.0.0';
+		protocol.network = 'NEAR_MAINNET';
+		protocol.type = 'LENDING';
+		protocol.lendingType = 'POOLED';
+		protocol.riskType = 'GLOBAL';
 		protocol.totalValueLockedUSD = BD_ZERO;
-		protocol.protocolControlledValueUSD = BD_ZERO;
 		protocol.cumulativeUniqueUsers = 0;
 		protocol.cumulativeSupplySideRevenueUSD = BD_ZERO;
 		protocol.cumulativeProtocolSideRevenueUSD = BD_ZERO;
@@ -29,10 +30,10 @@ export function getOrCreateProtocol(): LendingProtocol {
 export function getOrCreateUsageMetricsDailySnapshot(
 	receipt: near.ReceiptWithOutcome
 ): UsageMetricsDailySnapshot {
-	let timestamp = receipt.block.header.timestampNanosec / 86400000000000;
-	let id = timestamp.toString();
+	const timestamp = receipt.block.header.timestampNanosec / 86400000000000;
+	const id = timestamp.toString();
 	let usageMetricsDailySnapshot = UsageMetricsDailySnapshot.load(id);
-	let protocol = getOrCreateProtocol()
+	const protocol = getOrCreateProtocol()
 	if (!usageMetricsDailySnapshot) {
 		usageMetricsDailySnapshot = new UsageMetricsDailySnapshot(id);
 		usageMetricsDailySnapshot.dailyActiveUsers = 0;
@@ -61,10 +62,10 @@ export function getOrCreateUsageMetricsDailySnapshot(
 export function getOrCreateUsageMetricsHourlySnapshot( 
 	receipt: near.ReceiptWithOutcome
 ): UsageMetricsHourlySnapshot {
-	let timestamp = receipt.block.header.timestampNanosec / 3600000000000;
-	let id = timestamp.toString();
+	const timestamp = receipt.block.header.timestampNanosec / 3600000000000;
+	const id = timestamp.toString();
 	let usageMetricsHourlySnapshot = UsageMetricsHourlySnapshot.load(id);
-	let protocol = getOrCreateProtocol()
+	const protocol = getOrCreateProtocol()
 	if (!usageMetricsHourlySnapshot) {
 		usageMetricsHourlySnapshot = new UsageMetricsHourlySnapshot(id);
 		usageMetricsHourlySnapshot.hourlyActiveUsers = 0;
@@ -85,10 +86,10 @@ export function getOrCreateUsageMetricsHourlySnapshot(
 export function getOrCreateFinancialDailySnapshot(
 	receipt: near.ReceiptWithOutcome
 ): FinancialsDailySnapshot {
-	let timestamp = receipt.block.header.timestampNanosec / 86400000000000;
-	let id = timestamp.toString();
+	const timestamp = receipt.block.header.timestampNanosec / 86400000000000;
+	const id = timestamp.toString();
 	let financialsDailySnapshot = FinancialsDailySnapshot.load(id);
-	let protocol = getOrCreateProtocol();
+	const protocol = getOrCreateProtocol();
 	if (!financialsDailySnapshot) {
 		financialsDailySnapshot = new FinancialsDailySnapshot(id);
 		financialsDailySnapshot.protocol = getOrCreateProtocol().id;

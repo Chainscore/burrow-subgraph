@@ -6,11 +6,11 @@ import {
 	log,
 	BigDecimal,
 	JSONValueKind,
-	json,
-} from "@graphprotocol/graph-ts";
-import { getOrCreateToken } from "../helpers/token";
-import { getOrCreateProtocol } from "../helpers/protocol";
-import { BD_ZERO } from "../utils/const";
+} from '@graphprotocol/graph-ts';
+
+import { getOrCreateToken } from '../helpers/token';
+import { getOrCreateProtocol } from '../helpers/protocol';
+import { BD_ZERO } from '../utils/const';
 
 export function handleOracleCall(
 	method: string,
@@ -18,34 +18,34 @@ export function handleOracleCall(
 	data: TypedMap<string, JSONValue>,
 	receipt: near.ReceiptWithOutcome
 ): void {
-	let controller = getOrCreateProtocol();
-	let eventArgsArr = data.get("data");
+	const controller = getOrCreateProtocol();
+	const eventArgsArr = data.get('data');
 	if (!eventArgsArr) {
-		log.warning("ORACLE::Data not found {}", [args]);
+		log.warning('ORACLE::Data not found {}', [args]);
 		return;
 	}
 	if (eventArgsArr.kind != JSONValueKind.OBJECT) {
-		log.warning("ORACLE::Incorrect type eventArgsArr {}", [
+		log.warning('ORACLE::Incorrect type eventArgsArr {}', [
 			eventArgsArr.kind.toString(),
 		]);
 		return;
 	}
-	let eventArgs = eventArgsArr.toObject();
-	let prices = eventArgs.get("prices");
+	const eventArgs = eventArgsArr.toObject();
+	const prices = eventArgs.get('prices');
 	if (!prices) {
-		log.warning("ORACLE::Prices not found. Args: {}", [args]);
+		log.warning('ORACLE::Prices not found. Args: {}', [args]);
 		return;
 	} else if (prices.kind !== JSONValueKind.ARRAY) {
-		log.warning("ORACLE::Prices kind not array {}", [
+		log.warning('ORACLE::Prices kind not array {}', [
 			prices.kind.toString(),
 		]);
 		return;
 	}
-	let pricesArr = prices.toArray();
+	const pricesArr = prices.toArray();
 
 	for (let i = 0; i < pricesArr.length; i++) {
 		if (pricesArr[i].kind != JSONValueKind.OBJECT) {
-			log.warning("ORACLE::Incorrect type pricesArr {}", [
+			log.warning('ORACLE::Incorrect type pricesArr {}', [
 				pricesArr[i].kind.toString(),
 			]);
 			return;
@@ -54,33 +54,33 @@ export function handleOracleCall(
 		/* -------------------------------------------------------------------------- */
 		/*                                  Asset ID                                  */
 		/* -------------------------------------------------------------------------- */
-		let price = pricesArr[i].toObject();
-		let token_id = price.get("asset_id");
+		const price = pricesArr[i].toObject();
+		const token_id = price.get('asset_id');
 		if (!token_id) {
-			log.warning("ORACLE::Token unable to parse {}", ["token_id"]);
+			log.warning('ORACLE::Token unable to parse {}', ['token_id']);
 			return;
 		}
 
 		/* -------------------------------------------------------------------------- */
 		/*                                    Price                                   */
 		/* -------------------------------------------------------------------------- */
-		let priceObj = price.get("price");
+		const priceObj = price.get('price');
 		if (!priceObj) {
-			log.warning("ORACLE::Token unable to parse {}", ["priceObj"]);
+			log.warning('ORACLE::Token unable to parse {}', ['priceObj']);
 			return;
 		}
 		if (priceObj.isNull()) {
-			log.warning("ORACLE::Price is null {}", [token_id.toString()]);
+			log.warning('ORACLE::Price is null {}', [token_id.toString()]);
 			continue;
 		} else {
 			/* -------------------------------------------------------------------------- */
 			/*                                 Multiplier                                 */
 			/* -------------------------------------------------------------------------- */
-			let multiplier = priceObj.toObject().get("multiplier");
-			let decimals = priceObj.toObject().get("decimals");
+			const multiplier = priceObj.toObject().get('multiplier');
+			const decimals = priceObj.toObject().get('decimals');
 			if (!multiplier || !decimals) {
-				log.warning("ORACLE::Token unable to get {}", [
-					"multiplier | decimals",
+				log.warning('ORACLE::Token unable to get {}', [
+					'multiplier | decimals',
 				]);
 				return;
 			}
@@ -90,17 +90,17 @@ export function handleOracleCall(
 				decimals.kind != JSONValueKind.NUMBER
 			) {
 				log.warning(
-					"ORACLE::Incorrect type multiplier {} decimals {}",
+					'ORACLE::Incorrect type multiplier {} decimals {}',
 					[multiplier.kind.toString(), decimals.kind.toString()]
 				);
 				return;
 			}
 
-			let token = getOrCreateToken(token_id.toString());
+			const token = getOrCreateToken(token_id.toString());
 			let decimalFactor = decimals.toI64() - token.decimals;
 			if (decimalFactor > 254 || decimalFactor < 0) {
 				log.warning(
-					"ORACLE::Decimal factor {} Token {} OracleDecimals {} TokenDecimals  {} Extradecimals {}",
+					'ORACLE::Decimal factor {} Token {} OracleDecimals {} TokenDecimals  {} Extradecimals {}',
 					[
 						decimalFactor.toString(),
 						token.id,
@@ -128,7 +128,7 @@ export function handleOracleCall(
 				token.save();
 			} else {
 				log.warning(
-					"ORACLE::Token price is zero {} :: multiplier {} :: decimals {}",
+					'ORACLE::Token price is zero {} :: multiplier {} :: decimals {}',
 					[token.id, multiplier.toString(), decimals.toString()]
 				);
 			}

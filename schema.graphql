@@ -1256,21 +1256,4 @@ type Liquidate @entity {
   " Amount of profit from liquidation in USD "
   profitUSD: BigDecimal!
 }
-
-###################
-##### Helpers #####
-###################
-
-type Event @entity {
-  id: ID!
-  name: String!
-  args: String!
-  timestamp: BigInt!
-}
-
-type Method @entity {
-  id: ID!
-  name: String!
-  args: String!
-  timestamp: BigInt!
-}
+ 
