@@ -70,7 +70,8 @@ export function getOrCreateMarket(id: string): Market {
 		r._totalWithrawnHistory = BI_ZERO;
 		r._totalDepositedHistory = BI_ZERO;
 
-		r._totalBorrowed = BI_ZERO;
+		r._totalBorrowed = BD_ZERO;
+		r._totalDeposited = BD_ZERO;
 		r._totalBorrowedHistory = BI_ZERO;
 		r._totalRepaidHistory = BI_ZERO;
 

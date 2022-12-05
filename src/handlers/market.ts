@@ -300,7 +300,7 @@ export function handleUpdateAsset(
 		log.info('NEW_ASSET::can_withdraw not found {}', [args]);
 		return;
 	}
-	market.isActive = can_deposit.toBool() && can_withdraw.toBool();
+	market.isActive = can_deposit.toBool();
 
 	// Save
 	token.save();

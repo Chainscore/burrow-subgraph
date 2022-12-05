@@ -26,7 +26,7 @@ import {
 	getOrCreateFinancialDailySnapshot,
 } from "../helpers/protocol";
 import { Position } from "../../generated/schema";
-import { BI_ZERO } from "../utils/const";
+import { BI_ZERO, BD_BI, BI_BD } from '../utils/const';
 
 // { account_id, liquidation_account_id, collateral_sum, repaid_sum }
 export function handleLiquidate(
@@ -235,7 +235,7 @@ export function handleLiquidate(
 			receipt.block.header.height
 		);
 		repaidPosition.timestampClosed = BigInt.fromU64(
-			receipt.block.header.timestampNanosec / 1000000
+			receipt.block.header.timestampNanosec / 1000000000
 		);
 
 		collateralPosition.balance = BI_ZERO;
@@ -244,7 +244,7 @@ export function handleLiquidate(
 			receipt.block.header.height
 		);
 		collateralPosition.timestampClosed = BigInt.fromU64(
-			receipt.block.header.timestampNanosec / 1000000
+			receipt.block.header.timestampNanosec / 1000000000
 		);
 
 		liquidatee.openPositionCount -= 1;
@@ -264,19 +264,13 @@ export function handleLiquidate(
 			repaid_sum_value
 		);
 		repaidMarket._totalBorrowed = repaidMarket._totalBorrowed.minus(
-			BigInt.fromString(token_in_amount)
+			BigDecimal.fromString(token_in_amount)
 		);
-		repaidMarket.inputTokenBalance = repaidMarket.inputTokenBalance.minus(
-			BigInt.fromString(token_in_amount)
+		repaidMarket._totalDeposited = repaidMarket._totalDeposited.minus(
+			BigDecimal.fromString(token_in_amount)
 		);
 
-		dailySnapshot.cumulativeLiquidateUSD = dailySnapshot.cumulativeLiquidateUSD.plus(
-			repaid_sum_value
-		);
 		dailySnapshot.dailyLiquidateUSD = dailySnapshot.dailyLiquidateUSD.plus(
-			repaid_sum_value
-		);
-		hourlySnapshot.cumulativeLiquidateUSD = hourlySnapshot.cumulativeLiquidateUSD.plus(
 			repaid_sum_value
 		);
 		hourlySnapshot.hourlyLiquidateUSD = hourlySnapshot.hourlyLiquidateUSD.plus(
@@ -391,34 +385,34 @@ export function handleForceClose(
 		if (borrow_position) {
 			if (borrow_position.balance.gt(BI_ZERO)) {
 				market._totalBorrowed = market._totalBorrowed.minus(
-					borrow_position.balance
+					BI_BD(borrow_position.balance)
 				);
-				market.inputTokenBalance = market.inputTokenBalance.minus(
-					borrow_position.balance
+				market._totalDeposited = market._totalDeposited.minus(
+					BI_BD(borrow_position.balance)
 				);
 				market._totalReserved = market._totalReserved.plus(
-					borrow_position.balance
+					BI_BD(borrow_position.balance)
 				);
 				borrow_position.balance = BI_ZERO;
 				borrow_position.hashClosed = receipt.receipt.id.toBase58();
 				borrow_position.timestampClosed = BigInt.fromU64(
-					receipt.block.header.timestampNanosec / 1000000
+					receipt.block.header.timestampNanosec / 1000000000
 				);
 				borrow_position.save();
 			}
 		}
 		if (supply_position) {
 			if (supply_position.balance.gt(BI_ZERO)) {
-				market.inputTokenBalance = market.inputTokenBalance.minus(
-					supply_position.balance
+				market._totalDeposited = market._totalDeposited.minus(
+					BI_BD(supply_position.balance)
 				);
 				market._totalReserved = market._totalReserved.plus(
-					supply_position.balance
+					BI_BD(supply_position.balance)
 				);
 				supply_position.balance = BI_ZERO;
 				supply_position.hashClosed = receipt.receipt.id.toBase58();
 				supply_position.timestampClosed = BigInt.fromU64(
-					receipt.block.header.timestampNanosec / 1000000
+					receipt.block.header.timestampNanosec / 1000000000
 				);
 				supply_position.save();
 			}

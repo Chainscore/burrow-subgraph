@@ -5,6 +5,7 @@ import { getOrCreateBorrowRate } from '../helpers/rates';
 
 import { getRate } from './rates';
 import { bigDecimalExponential } from './math';
+import { getOrCreateToken } from '../helpers/token';
 
 const BD = (n: string): BigDecimal => BigDecimal.fromString(n);
 
@@ -27,10 +28,13 @@ export function compound(
 	);
 
 	const interest = interestScaled
-		.times(market._totalBorrowed.toBigDecimal())
-		.minus(market._totalBorrowed.toBigDecimal())
+		.times(market._totalBorrowed)
+		.minus(market._totalBorrowed)
 		.truncate(0);
 
+	const token = getOrCreateToken(market.inputToken);
+	log.info('market {} :: interest: {}', [market.name!, interest.div(BigInt.fromI32(10).pow((token.decimals + token.extraDecimals) as u8).toBigDecimal()).toString()]);
+	
 	if (interestScaled.equals(BD_ONE)) {
 		return [BD_ZERO, BD_ZERO];
 	}
@@ -38,18 +42,17 @@ export function compound(
 	// TODO: Split interest based on ratio between reserved and supplied?
 	const reserved = interest
 		.times(market._reserveRatio.toBigDecimal())
-		.div(BD('10000'))
-		.truncate(0);
+		.div(BD('10000'));
 
 	market._totalReserved = market._totalReserved.plus(
-		BigInt.fromString(reserved.toString())
+		reserved
 	);
 	
-	market.inputTokenBalance = market.inputTokenBalance.plus(
-		BigInt.fromString(interest.minus(reserved).toString())
+	market._totalDeposited = market._totalDeposited.plus(
+		interest.minus(reserved)
 	);
 	market._totalBorrowed = market._totalBorrowed.plus(
-		BigInt.fromString(interest.toString())
+		interest
 	);
 
 	// sub remaining reward

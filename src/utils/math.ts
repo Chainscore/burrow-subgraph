@@ -27,6 +27,7 @@ export function bigDecimalExponential(
 				.times(rate)
 				.times(rate)
 		);
+			
 	return BD_ONE.plus(firstTerm)
 		.plus(secondTerm)
 		.plus(thirdTerm)

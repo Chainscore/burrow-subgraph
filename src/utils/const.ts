@@ -8,6 +8,7 @@ export const BD_ONE = BigDecimal.fromString('1')
 export const ADDRESS_ZERO = '0x0000000000000000000000000000000000000000'
 
 export const BI_BD = (n: BigInt): BigDecimal => BigDecimal.fromString(n.toString());
+export const BD_BI = (n: BigDecimal): BigInt => BigInt.fromString(n.truncate(0).toString());
 export const BD = (n: string): BigDecimal => BigDecimal.fromString(n);
 
 export const BIGDECIMAL_ONE = BD('1');

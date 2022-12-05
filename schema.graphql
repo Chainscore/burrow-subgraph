@@ -658,16 +658,17 @@ type Market @entity {
 
 
   " Metadata for this market "
+  _totalDeposited: BigDecimal!
+  _totalReserved: BigDecimal!
+  _totalBorrowed: BigDecimal!
+  _added_to_reserve: BigDecimal!
   _totalDepositedHistory: BigInt!
   _totalWithrawnHistory: BigInt!
-  _totalReserved: BigInt!
-  _added_to_reserve: BigInt!
+  _totalBorrowedHistory: BigInt!
+  _totalRepaidHistory: BigInt! 
 
   _last_update_timestamp: BigInt!
   _utilization: BigDecimal!
-  _totalBorrowed: BigInt!
-  _totalBorrowedHistory: BigInt!
-  _totalRepaidHistory: BigInt! 
 
   _reward_remaining_amounts: [BigInt!]!
 

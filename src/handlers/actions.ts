@@ -3,6 +3,7 @@ import {
 	BigInt,
 	JSONValue,
 	TypedMap,
+	log,
 } from '@graphprotocol/graph-ts';
 import { getOrCreateAccount } from '../helpers/account';
 import { getOrCreatePosition, getOrCreatePositionSnapshot } from '../helpers/position';
@@ -16,7 +17,8 @@ import { amount_to_shares } from '../utils/shares';
 import { updateProtocol } from '../update/protocol';
 import { getOrCreateUsageMetricsDailySnapshot, getOrCreateUsageMetricsHourlySnapshot, getOrCreateFinancialDailySnapshot, getOrCreateProtocol } from '../helpers/protocol';
 import { parse0 } from '../utils/parser';
-import { BI_ZERO } from '../utils/const';
+import { BI_ZERO, BI_BD, BD_ZERO } from '../utils/const';
+import { BigDecimal } from '@graphprotocol/graph-ts';
 
 export function handleDeposit(
 	data: TypedMap<string, JSONValue>, 
@@ -93,8 +95,8 @@ export function handleDeposit(
 	account._last_active_timestamp = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000000);
 
 	// deposit amount
-	market.outputTokenSupply = market.outputTokenSupply.plus(amount_to_shares(deposit.amount, market.outputTokenSupply, market.inputTokenBalance));
-	market.inputTokenBalance = market.inputTokenBalance.plus(deposit.amount);
+	market.outputTokenSupply = market.outputTokenSupply.plus(amount_to_shares(BI_BD(deposit.amount), market.outputTokenSupply, market._totalDeposited));
+	market._totalDeposited = market._totalDeposited.plus(BI_BD(deposit.amount));
 	
 	// historical
 	market._totalDepositedHistory = market._totalDepositedHistory.plus(deposit.amount);
@@ -139,14 +141,14 @@ export function handleDepositToReserve(
 
 	const market = getOrCreateMarket(token_id);
 
-	market._totalReserved = market._totalReserved.plus(BigInt.fromString(amount));
+	market._totalReserved = market._totalReserved.plus(BigDecimal.fromString(amount));
 	// for revenue calculation
-	market._added_to_reserve = market._added_to_reserve.plus(BigInt.fromString(amount));
+	market._added_to_reserve = market._added_to_reserve.plus(BigDecimal.fromString(amount));
 
 	market.save();
 }
 
-export function handleWithdraw(
+export function handleWithdraw( 
 	data: TypedMap<string, JSONValue>,
 	receipt: near.ReceiptWithOutcome,
 	logIndex: number,
@@ -206,10 +208,12 @@ export function handleWithdraw(
 	usageHourlySnapshot.hourlyTransactionCount += 1;
 
 	// withdrawal without deposit
-	if(market.inputTokenBalance.lt(withdraw.amount)){
-		market._added_to_reserve = market._added_to_reserve.minus(position.balance);
-		market._totalReserved = market._totalReserved.minus(position.balance);
-	} else {
+	// if(market.inputTokenBalance.lt(withdraw.amount)){
+	// 	const amount = withdraw.amount.minus(market.inputTokenBalance);
+	// 	market.inputTokenBalance = BigInt.fromI32(0);
+	// 	market._added_to_reserve = market._added_to_reserve.minus(amount);
+	// 	market._totalReserved = market._totalReserved.minus(amount);
+	// } else {
 		position.withdrawCount += 1;
 		
 		// close if balance is zero
@@ -226,13 +230,23 @@ export function handleWithdraw(
 			position.timestampClosed = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000000);
 			position.blockNumberClosed = BigInt.fromU64(receipt.block.header.height);
 		}
-	}
-
+	// }
+	
 	account.withdrawCount = account.withdrawCount + 1;
 	market._totalWithrawnHistory = market._totalWithrawnHistory.plus(withdraw.amount);
-
-	market.outputTokenSupply = market.outputTokenSupply.minus(amount_to_shares(withdraw.amount, market.outputTokenSupply, market.inputTokenBalance));
-	market.inputTokenBalance = market.inputTokenBalance.minus(withdraw.amount);
+	
+	market.outputTokenSupply = market.outputTokenSupply.minus(amount_to_shares(BI_BD(withdraw.amount), market.outputTokenSupply, market._totalDeposited));
+	market._totalDeposited = market._totalDeposited.minus(BI_BD(withdraw.amount));
+	
+	if(market._totalDeposited.lt(BD_ZERO)){
+		market._totalReserved = market._totalReserved.plus(market._totalDeposited);
+		market._totalDeposited = BD_ZERO;
+		market.outputTokenSupply = BI_ZERO;
+		if(market._totalReserved.lt(BD_ZERO)){
+			log.warning('OVERFLOW :: market._totalReserved < 0', []);
+			market._totalReserved = BD_ZERO;
+		}
+	}
 
 	// snapshot
 	dailySnapshot.dailyWithdrawUSD = dailySnapshot.dailyWithdrawUSD.plus(withdraw.amountUSD);
@@ -328,14 +342,14 @@ export function handleBorrow(
 	}
 	account.borrowCount += 1;
 	// asset.borrowed.deposit(borrowed_shares, amount);
-	market._totalBorrowed = market._totalBorrowed.plus(borrow.amount);
+	market._totalBorrowed = market._totalBorrowed.plus(BI_BD(borrow.amount));
 	market._totalBorrowedHistory = market._totalBorrowedHistory.plus(borrow.amount);
 	market.cumulativeBorrowUSD = market.cumulativeBorrowUSD.plus(borrow.amountUSD);
 	
 	// borrowed amount gets withdrawn from the account => so we need to add that to deposits
 	// asset.supplied.deposit(supplied_shares, amount);
-	market.inputTokenBalance = market.inputTokenBalance.plus(borrow.amount);
-	market.outputTokenSupply = market.outputTokenSupply.plus(amount_to_shares(borrow.amount, market.outputTokenSupply, market.inputTokenBalance));
+	market._totalDeposited = market._totalDeposited.plus(BI_BD(borrow.amount));
+	market.outputTokenSupply = market.outputTokenSupply.plus(amount_to_shares(BI_BD(borrow.amount), market.outputTokenSupply, market._totalDeposited));
 
 	// snapshot
 	dailySnapshot.dailyBorrowUSD = dailySnapshot.dailyBorrowUSD.plus(borrow.amountUSD);
@@ -439,13 +453,13 @@ export function handleRepayment(
 	account.repayCount += 1;
 
 	// asset.borrowed.withdraw(borrowed_shares, amount);
-	market._totalBorrowed = market._totalBorrowed.minus(repay.amount);
+	market._totalBorrowed = market._totalBorrowed.minus(BI_BD(repay.amount));
 	market._totalRepaidHistory = market._totalRepaidHistory.plus(repay.amount);
 
 	// minus repay amount from total deposited => because user has to deposit first to repay loan
 	// asset.supplied.withdraw(supplied_shares, amount);
-	market.inputTokenBalance = market.inputTokenBalance.minus(repay.amount);
-	market.outputTokenSupply = market.outputTokenSupply.minus(amount_to_shares(repay.amount, market.outputTokenSupply, market.inputTokenBalance));
+	market._totalDeposited = market._totalDeposited.minus(BI_BD(repay.amount));
+	market.outputTokenSupply = market.outputTokenSupply.minus(amount_to_shares(BI_BD(repay.amount), market.outputTokenSupply, market._totalDeposited));
 
 	// snapshot
 	dailySnapshot.dailyRepayUSD = dailySnapshot.dailyRepayUSD.plus(repay.amountUSD);

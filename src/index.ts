@@ -11,7 +11,7 @@ import {
 } from '@graphprotocol/graph-ts';
 // import { getOrCreateAccount, getOrCreateToken } from './helpers';
 
-import {Event, Method} from '../generated/schema';
+// import {Event, Method} from '../generated/schema';
 
 import { handleDeposit, handleDepositToReserve, handleWithdraw, handleBorrow, handleRepayment } from './handlers/actions';
 import { handleNew } from './handlers/config';
@@ -45,14 +45,14 @@ function handleAction(
 		const argsObject = argsData.value.toObject();
 		handleMethod(methodName, methodArgs.toString(), argsObject, receipt);
 	} else {
-		log.info('Invalid args {} {}', [methodName, methodArgs.toString()]);
+		log.warning('Invalid args {} {}', [methodName, methodArgs.toString()]);
 	}
 
 	for (let logIndex = 0; logIndex < outcome.logs.length; logIndex++) {
 		const outcomeLog = outcome.logs[logIndex].toString().slice('EVENT_JSON:'.length);
 		const jsonData = json.try_fromString(outcomeLog);
 		if(jsonData.isError) {
-			log.info('Error parsing ourcomeLog {}', [outcomeLog])
+			log.warning('Error parsing ourcomeLog {}', [outcomeLog])
 			return
 		}
 		const jsonObject = jsonData.value.toObject();
@@ -75,13 +75,6 @@ function handleEvent(
 	method?: string,
 	args?: TypedMap<string, JSONValue>
 ): void {
-	// log.info('Event from method {}: {}:: With data: {}', [method ?? '', event, outcomeLog])
-    const _event = new Event('EVENT:' + receipt.receipt.id.toBase58());
-	_event.name = event
-    _event.args = outcomeLog;
-	_event.timestamp = BigInt.fromString(receipt.block.header.timestampNanosec.toString())
-    _event.save();
-
 	if(event == 'deposit'){
 		handleDeposit(data, receipt, logIndex, method, args)
 	}
@@ -102,7 +95,14 @@ function handleEvent(
 	} 
 	else if(event == 'force_close'){
 		handleForceClose(data, receipt, logIndex, method, args)
-	}
+	} 
+	// else {
+	// 	const _event = new Event('EVENT:' + receipt.receipt.id.toBase58());
+	// 	_event.name = event
+	// 	_event.args = outcomeLog;
+	// 	_event.timestamp = BigInt.fromString(receipt.block.header.timestampNanosec.toString())
+	// 	_event.save();
+	// }
 }
 
 function handleMethod(
@@ -111,13 +111,6 @@ function handleMethod(
 	data: TypedMap<string, JSONValue>,
 	receipt: near.ReceiptWithOutcome
 ): void {
-	// log.info('Method {}: args {}', [method, args])
-	const _method = new Method('METHOD:' + receipt.receipt.id.toBase58());
-	_method.name = method
-    _method.args = args;
-	_method.timestamp = BigInt.fromString(receipt.block.header.timestampNanosec.toString())
-    _method.save();
-
 	if(method == 'new' || method == 'update_config') {
 		handleNew(method, args, data, receipt)
 	} 
@@ -132,5 +125,12 @@ function handleMethod(
 	}
 	else if(method == 'add_asset_farm_reward') {
 		handleAddAssetFarmReward(method, args, data, receipt)
-	}
+	} 
+	// else {
+	// 	const _method = new Method('METHOD:' + receipt.receipt.id.toBase58());
+	// 	_method.name = method
+	// 	_method.args = args;
+	// 	_method.timestamp = BigInt.fromString(receipt.block.header.timestampNanosec.toString())
+	// 	_method.save();
+	// }
 }

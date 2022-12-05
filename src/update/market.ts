@@ -3,6 +3,7 @@ import { Market, MarketDailySnapshot, MarketHourlySnapshot, FinancialsDailySnaps
 import { compound } from '../utils/compound';
 import { updateApr } from '../utils/rates';
 import { getOrCreateToken } from '../helpers/token';
+import { BI_ZERO, BI_BD, BD_BI } from '../utils/const';
 
 export function updateMarket(
 	market: Market,
@@ -23,6 +24,7 @@ export function updateMarket(
 	market.inputTokenPriceUSD = token.lastPriceUSD!;
 
 	// totalDepositBalanceUSD
+	market.inputTokenBalance = BD_BI(market._totalDeposited);
 	market.totalDepositBalanceUSD = market.inputTokenBalance
 		.toBigDecimal()
 		.div(
@@ -54,7 +56,6 @@ export function updateMarket(
 
 	// totalBorrowBalanceUSD
 	market.totalBorrowBalanceUSD = market._totalBorrowed
-		.toBigDecimal()
 		.div(
 			BigInt.fromI32(10)
 				.pow((token.decimals + token.extraDecimals) as u8)
@@ -64,9 +65,13 @@ export function updateMarket(
 
 	// exchangeRate
 	market.inputTokenPriceUSD = token.lastPriceUSD!;
-	market.exchangeRate = market.inputTokenBalance
+	if(market.outputTokenSupply.gt(BI_ZERO)){
+		market.exchangeRate = market.inputTokenBalance
 		.toBigDecimal()
 		.div(market.outputTokenSupply.toBigDecimal());
+	} else {
+		market.exchangeRate = BigInt.fromI32(0).toBigDecimal();
+	}
 	// outputTokenPriceUSD
 	market.outputTokenPriceUSD = market.exchangeRate!.times(
 		market.inputTokenPriceUSD
