@@ -1,7 +1,8 @@
 import { Market } from '../../generated/schema';
 import { BD_ZERO } from '../utils/const';
 import { getOrCreateProtocol, getOrCreateUsageMetricsDailySnapshot } from '../helpers/protocol';
-import { near } from '@graphprotocol/graph-ts';
+import { near, BigInt } from '@graphprotocol/graph-ts';
+import { getOrCreateToken } from '../helpers/token';
 
 export function updateProtocol(): void {
 	let protocol = getOrCreateProtocol();
@@ -21,9 +22,12 @@ export function updateProtocol(): void {
 	for (let i = 0; i < protocol._marketIds.length; i++) {
 		const market = Market.load(protocol._marketIds[i]);
 		if (market) {
+			const token = getOrCreateToken(market.inputToken);
 			// totalValueLockedUSD
 			protocol.totalValueLockedUSD = protocol.totalValueLockedUSD.plus(
 				market.totalValueLockedUSD
+			).plus(
+				market._totalReserved.times(market.inputTokenPriceUSD).div(BigInt.fromI32(10).pow(token.decimals + token.extraDecimals as u8).toBigDecimal())
 			);
 			// cumulativeSupplySideRevenueUSD
 			protocol.cumulativeSupplySideRevenueUSD = protocol.cumulativeSupplySideRevenueUSD.plus(
