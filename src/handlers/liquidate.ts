@@ -1,8 +1,5 @@
 import {
-	near,
 	BigInt,
-	JSONValue,
-	TypedMap,
 	log,
 	BigDecimal,
 	JSONValueKind,
@@ -25,17 +22,17 @@ import {
 	getOrCreateUsageMetricsHourlySnapshot,
 	getOrCreateFinancialDailySnapshot,
 } from "../helpers/protocol";
-import { Position } from "../../generated/schema";
-import { BI_ZERO, BD_BI, BI_BD } from '../utils/const';
+import { Position, _PositionCounter } from "../../generated/schema";
+import { BI_ZERO, BI_BD, NANOSEC_TO_SEC } from "../utils/const";
+import { EventData } from "../utils/type";
 
 // { account_id, liquidation_account_id, collateral_sum, repaid_sum }
-export function handleLiquidate(
-	data: TypedMap<string, JSONValue>,
-	receipt: near.ReceiptWithOutcome,
-	logIndex: number,
-	method?: string,
-	args?: TypedMap<string, JSONValue>
-): void {
+export function handleLiquidate(event: EventData): void {
+	const receipt = event.receipt;
+	const data = event.data;
+	const logIndex = event.logIndex;
+	const args = event.args;
+
 	const protocol = getOrCreateProtocol();
 
 	const usageHourly = getOrCreateUsageMetricsHourlySnapshot(receipt);
@@ -43,15 +40,6 @@ export function handleLiquidate(
 	const usageDaily = getOrCreateUsageMetricsDailySnapshot(receipt);
 	usageDaily.dailyLiquidateCount += 1;
 	const financialDaily = getOrCreateFinancialDailySnapshot(receipt);
-
-	const liq = getOrCreateLiquidation(
-		receipt.outcome.id
-			.toBase58()
-			.concat("-")
-			.concat((logIndex as i32).toString()),
-		receipt
-	);
-	liq.logIndex = logIndex as i32;
 
 	/* -------------------------------------------------------------------------- */
 	/*                                 Liquidator                                 */
@@ -72,7 +60,6 @@ export function handleLiquidate(
 	}
 
 	liquidator.liquidateCount += 1;
-	liq.liquidator = liquidator.id;
 
 	/* -------------------------------------------------------------------------- */
 	/*                                 Liquidatee                                 */
@@ -91,7 +78,6 @@ export function handleLiquidate(
 		usageDaily.dailyActiveLiquidatees += 1;
 	}
 	liquidatee.liquidationCount += 1;
-	liq.liquidatee = liquidatee.id;
 
 	/* -------------------------------------------------------------------------- */
 	/*                              Collateral Amount                             */
@@ -105,7 +91,6 @@ export function handleLiquidate(
 	const collateral_sum_value = BigDecimal.fromString(
 		collateral_sum.toString()
 	);
-	liq.amountUSD = collateral_sum_value;
 
 	/* -------------------------------------------------------------------------- */
 	/*                                Repaid Amount                               */
@@ -116,103 +101,76 @@ export function handleLiquidate(
 		return;
 	}
 	const repaid_sum_value = BigDecimal.fromString(repaid_sum.toString());
-	liq.profitUSD = liq.amountUSD.minus(repaid_sum_value);
+
+	// discount
+	const discountFactor = repaid_sum_value.div(collateral_sum_value);
 
 	// finding token_in, token_in_amount, token_out and token_out_amount
 	// TOKEN_IN: borrowed token
 	// TOKEN_OUT: collateral token
-	let token_in: string | null = null,
-		token_out: string | null = null;
-	let token_in_amount: string | null = null,
-		token_out_amount: string | null = null;
+	let token_in: string[] = new Array<string>(),
+		token_out: string[] = new Array<string>();
+	let token_in_amount: string[] = new Array<string>(),
+		token_out_amount: string[] = new Array<string>();
 	if (args) {
 		let msg = args.get("msg");
-		if (!msg) {
-			log.info("LIQ::Msg not found", []);
-			return;
-		}
-		log.info("LIQ::MSG {}", [msg.toString()]);
-		msg = json.fromString(msg.toString());
+		msg = json.fromString(msg!.toString());
 		const exec = msg.toObject().get("Execute");
-		if (!exec) {
-			log.info("LIQ::Execute not found", []);
-			return;
-		}
-
-		if (exec.kind != JSONValueKind.OBJECT) return;
-		const actions = exec.toObject().get("actions");
-		if (!actions) {
-			log.info("LIQ::Actions not found", []);
-			return;
-		}
-
-		if (actions.kind != JSONValueKind.ARRAY) return;
-		const actionsArr = actions.toArray();
+		const actions = exec!.toObject().get("actions");
+		const actionsArr = actions!.toArray();
 
 		for (let i = 0; i < actionsArr.length; i++) {
 			if (actionsArr[i].kind == JSONValueKind.OBJECT) {
-				let a = actionsArr[i].toObject();
-				let liqCall = a.get("Liquidate");
+				const a = actionsArr[i].toObject();
+				const liqCall = a.get("Liquidate");
 				if (liqCall) {
 					if (liqCall.kind == JSONValueKind.OBJECT) {
 						/* -------------------------------------------------------------------------- */
 						/*                       Repaid asset: id & amount                            */
 						/* -------------------------------------------------------------------------- */
-						let in_assets = liqCall.toObject().get("in_assets");
-						if (
-							in_assets &&
-							in_assets.kind == JSONValueKind.ARRAY
-						) {
-							if (
-								in_assets.toArray()[0].kind ==
-								JSONValueKind.OBJECT
-							) {
-								const asset = in_assets.toArray()[0].toObject();
-								const asset_id = asset.get("token_id");
-								const asset_amt = asset.get("amount");
-								if (asset_id && asset_amt) {
-									token_in = asset_id.toString();
-									token_in_amount = asset_amt.toString();
-								}
+						const in_assets = liqCall.toObject().get("in_assets");
+						const in_assets_array = in_assets!.toArray();
+							for(let i = 0; i < in_assets_array.length; i++){
+								const asset = in_assets_array[i].toObject();
+								const asset_id = asset.get("token_id")!.toString();
+								const asset_amt = asset.get("amount")!.toString();
+								token_in.push(asset_id);
+								token_in_amount.push(asset_amt);
 							}
+							
 						}
 						/* -------------------------------------------------------------------------- */
 						/*                            Collateral asset: id & amount                   */
 						/* -------------------------------------------------------------------------- */
 						const out_assets = liqCall.toObject().get("out_assets");
-						if (
-							out_assets &&
-							out_assets.kind == JSONValueKind.ARRAY
-						) {
-							if (
-								out_assets.toArray()[0].kind ==
-								JSONValueKind.OBJECT
-							) {
-								const asset = out_assets
-									.toArray()[0]
-									.toObject();
+						const out_assets_array = out_assets!.toArray();
+						for(let i = 0; i < out_assets_array.length; i++){
+								const asset = out_assets_array[i].toObject();
 								const asset_id = asset.get("token_id");
 								const asset_amt = asset.get("amount");
-								if (asset_id && asset_amt) {
-									token_out = asset_id.toString();
-									token_out_amount = asset_amt.toString();
-								}
-							}
+								token_out.push(asset_id!.toString());
+								token_out_amount.push(asset_amt!.toString());
 						}
 					}
 				}
 			}
 		}
-	}
+	
 
-	if (token_in && token_out && token_in_amount && token_out_amount) {
-		const repaidMarket = getOrCreateMarket(token_in);
-		const repaidPosition = getOrCreatePosition(
-			liquidatee,
-			repaidMarket,
-			"BORROWER",
+	for(let i = 0; i < token_in.length; i++){
+		const liq = getOrCreateLiquidation(
+			receipt.outcome.id
+				.toBase58()
+				.concat("-")
+				.concat(i.toString()),
 			receipt
 		);
+		liq.liquidator = liquidator.id;
+		liq.liquidatee = liquidatee.id;
+		
+
+		liq.logIndex = logIndex as i32;
+		const repaidMarket = getOrCreateMarket(token_in[i]);
 		const dailySnapshot = getOrCreateMarketDailySnapshot(
 			repaidMarket,
 			receipt
@@ -221,71 +179,112 @@ export function handleLiquidate(
 			repaidMarket,
 			receipt
 		);
-		const collateralMarket = getOrCreateMarket(token_out);
-		const collateralPosition = getOrCreatePosition(
+		const repaidCounterID = liquidatee.id
+			.concat("-")
+			.concat(repaidMarket.id)
+			.concat("-")
+			.concat("BORROWER");
+		const repaidCounter = _PositionCounter.load(repaidCounterID);
+		if (!repaidCounter) {
+			log.warning("[subtractPosition] position counter {} not found", [
+				repaidCounterID,
+			]);
+			return;
+		}
+		const repaidPosition = getOrCreatePosition(
 			liquidatee,
-			collateralMarket,
-			"LENDER",
-			receipt
+			repaidMarket,
+			"BORROWER",
+			receipt,
+			repaidCounter.nextCount
 		);
+		repaidPosition.balance = repaidPosition.balance.minus(
+			BigInt.fromString(token_in_amount[i])
+		);
+		if (repaidPosition.balance.lt(BI_ZERO)) {
+			repaidPosition.hashClosed = receipt.receipt.id.toBase58();
+			repaidPosition.blockNumberClosed = BigInt.fromU64(
+				receipt.block.header.height
+			);
+			repaidPosition.timestampClosed = BigInt.fromU64(
+				NANOSEC_TO_SEC(receipt.block.header.timestampNanosec)
+			);
+			repaidCounter.nextCount += 1;
+			// closing borrowed position
+			repaidMarket.openPositionCount -= 1;
+			repaidMarket.closedPositionCount += 1;
+		}
+		repaidPosition.save();
 
-		repaidPosition.balance = BI_ZERO;
-		repaidPosition.hashClosed = receipt.receipt.id.toBase58();
-		repaidPosition.blockNumberClosed = BigInt.fromU64(
-			receipt.block.header.height
+		const repaidUSD = BigDecimal.fromString(token_in_amount[i]).times(
+			repaidMarket.inputTokenPriceUSD
 		);
-		repaidPosition.timestampClosed = BigInt.fromU64(
-			receipt.block.header.timestampNanosec / 1000000000
-		);
-
-		collateralPosition.balance = BI_ZERO;
-		collateralPosition.hashClosed = receipt.receipt.id.toBase58();
-		collateralPosition.blockNumberClosed = BigInt.fromU64(
-			receipt.block.header.height
-		);
-		collateralPosition.timestampClosed = BigInt.fromU64(
-			receipt.block.header.timestampNanosec / 1000000000
-		);
-
-		liquidatee.openPositionCount -= 1;
-		// closing borrowed position
-		repaidMarket.openPositionCount -= 1;
-		repaidMarket.closedPositionCount += 1;
-		// closing collateral position
-		collateralMarket.openPositionCount -= 1;
-		collateralMarket.closedPositionCount += 1;
-
-		liq.asset = repaidMarket.id;
-		liq.market = collateralMarket.id;
-		liq.amount = BigInt.fromString(token_out_amount);
-		liq.position = repaidPosition.id;
 
 		repaidMarket.cumulativeLiquidateUSD = repaidMarket.cumulativeLiquidateUSD.plus(
-			repaid_sum_value
+			repaidUSD
 		);
 		repaidMarket._totalBorrowed = repaidMarket._totalBorrowed.minus(
-			BigDecimal.fromString(token_in_amount)
+			BigDecimal.fromString(token_in_amount[i])
 		);
 		repaidMarket._totalDeposited = repaidMarket._totalDeposited.minus(
-			BigDecimal.fromString(token_in_amount)
+			BigDecimal.fromString(token_in_amount[i])
 		);
 
-		dailySnapshot.dailyLiquidateUSD = dailySnapshot.dailyLiquidateUSD.plus(
-			repaid_sum_value
-		);
-		hourlySnapshot.hourlyLiquidateUSD = hourlySnapshot.hourlyLiquidateUSD.plus(
-			repaid_sum_value
-		);
+		liq.amountUSD = repaidUSD;
+		liq.profitUSD = repaidUSD.times(discountFactor);
+		liq.market = repaidMarket.id;
 
-		collateralPosition.save();
+		liq.save();
+		repaidCounter.save();
 		repaidPosition.save();
 		dailySnapshot.save();
 		hourlySnapshot.save();
 		repaidMarket.save();
+	}
+
+	for(let i = 0; i < token_out.length; i++){
+		const collateralMarket = getOrCreateMarket(token_out[i]);
+		const collateralCounterID = liquidatee.id
+			.concat("-")
+			.concat(collateralMarket.id)
+			.concat("-")
+			.concat("BORROWER");
+		const collateralCounter = _PositionCounter.load(collateralCounterID);
+		if (!collateralCounter) {
+			log.warning("[subtractPosition] position counter {} not found", [
+				collateralCounterID,
+			]);
+			return;
+		}
+		const collateralPosition = getOrCreatePosition(
+			liquidatee,
+			collateralMarket,
+			"LENDER",
+			receipt,
+			collateralCounter.nextCount
+		);
+
+		collateralPosition.balance = collateralPosition.balance.minus(
+			BigInt.fromString(token_out_amount[i])
+		);
+		if (collateralPosition.balance.lt(BI_ZERO)) {
+			collateralPosition.balance = BI_ZERO;
+			collateralPosition.hashClosed = receipt.receipt.id.toBase58();
+			collateralPosition.blockNumberClosed = BigInt.fromU64(
+				receipt.block.header.height
+			);
+			collateralPosition.timestampClosed = BigInt.fromU64(
+				NANOSEC_TO_SEC(receipt.block.header.timestampNanosec)
+			);
+			collateralCounter.nextCount += 1;
+			// closing collateral position
+			collateralMarket.openPositionCount -= 1;
+			collateralMarket.closedPositionCount += 1;
+			liquidatee.openPositionCount -= 1;
+		}
+		collateralCounter.save();
+		collateralPosition.save();
 		collateralMarket.save();
-	} else {
-		log.warning("LIQ::Liquidation data not found", []);
-		return;
 	}
 
 	liquidator.save();
@@ -294,20 +293,16 @@ export function handleLiquidate(
 		repaid_sum_value
 	);
 	financialDaily.save();
-	liq.save();
 	protocol.save();
 	usageHourly.save();
 	usageDaily.save();
 	updateProtocol();
 }
 
-export function handleForceClose(
-	data: TypedMap<string, JSONValue>,
-	receipt: near.ReceiptWithOutcome,
-	logIndex: number,
-	method?: string,
-	args?: TypedMap<string, JSONValue>
-): void {
+export function handleForceClose(event: EventData): void {
+	const receipt = event.receipt;
+	const data = event.data;
+
 	const protocol = getOrCreateProtocol();
 	const dailyProtocol = getOrCreateUsageMetricsDailySnapshot(receipt);
 	const hourlyProtocol = getOrCreateUsageMetricsHourlySnapshot(receipt);
@@ -396,7 +391,7 @@ export function handleForceClose(
 				borrow_position.balance = BI_ZERO;
 				borrow_position.hashClosed = receipt.receipt.id.toBase58();
 				borrow_position.timestampClosed = BigInt.fromU64(
-					receipt.block.header.timestampNanosec / 1000000000
+					NANOSEC_TO_SEC(receipt.block.header.timestampNanosec)
 				);
 				borrow_position.save();
 			}
@@ -412,7 +407,7 @@ export function handleForceClose(
 				supply_position.balance = BI_ZERO;
 				supply_position.hashClosed = receipt.receipt.id.toBase58();
 				supply_position.timestampClosed = BigInt.fromU64(
-					receipt.block.header.timestampNanosec / 1000000000
+					NANOSEC_TO_SEC(receipt.block.header.timestampNanosec)
 				);
 				supply_position.save();
 			}

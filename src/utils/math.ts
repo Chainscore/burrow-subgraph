@@ -1,5 +1,5 @@
-import { BigDecimal, BigInt, near, log } from '@graphprotocol/graph-ts';
-import { BD_ONE, BD_ZERO, BIGDECIMAL_ONE, BIGDECIMAL_SIX, BIGDECIMAL_THREE, BIGDECIMAL_TWELVE, BIGDECIMAL_TWO, BI_ZERO } from './const';
+import { BigDecimal } from '@graphprotocol/graph-ts';
+import { BD_ONE, BIGDECIMAL_ONE, BIGDECIMAL_SIX, BIGDECIMAL_THREE, BIGDECIMAL_TWELVE, BIGDECIMAL_TWO } from './const';
 
 // a fast approximation of (1 + rate)^exponent
 export function bigDecimalExponential(

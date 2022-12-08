@@ -1,21 +1,12 @@
-import {
-	near,
-	JSONValue,
-	TypedMap
-} from '@graphprotocol/graph-ts';
-
-import {
-	getOrCreateToken,
-} from '../helpers/token';
+import { getOrCreateToken } from '../helpers/token';
 
 import { getOrCreateProtocol } from '../helpers/protocol';
+import { EventData } from '../utils/type';
 
 export function handleNew(
-	method: string,
-	args: string, // only for logging: remove afterwards
-	data: TypedMap<string, JSONValue>,
-	receipt: near.ReceiptWithOutcome
+	event: EventData
 ): void {
+	const data = event.data;
 	const controller = getOrCreateProtocol();
 	const eventArgsArr = data.get('config');
 	if (!eventArgsArr) return;

@@ -1,20 +1,21 @@
 import { dataSource, near, BigInt } from '@graphprotocol/graph-ts';
 import { LendingProtocol, UsageMetricsDailySnapshot, UsageMetricsHourlySnapshot, FinancialsDailySnapshot } from '../../generated/schema';
-import { BD_ZERO } from '../utils/const';
+import { BD_ZERO, LendingType, NANOSEC_TO_SEC, Network, ProtocolType, PROTOCOL_NAME, PROTOCOL_SLUG, RiskType, NANOS_TO_DAY, NANOS_TO_HOUR } from '../utils/const';
+import { Versions } from "../versions";
 
 export function getOrCreateProtocol(): LendingProtocol {
 	let protocol = LendingProtocol.load(dataSource.address().toString());
 	if (!protocol) {
 		protocol = new LendingProtocol(dataSource.address().toString());
-		protocol.name = 'Burrow';
-		protocol.slug = 'burrow';
-		protocol.schemaVersion = '2.0.1';
-		protocol.subgraphVersion = '1.0.0';
-		protocol.methodologyVersion = '1.0.0';
-		protocol.network = 'NEAR_MAINNET';
-		protocol.type = 'LENDING';
-		protocol.lendingType = 'POOLED';
-		protocol.riskType = 'GLOBAL';
+		protocol.name = PROTOCOL_NAME;
+		protocol.slug = PROTOCOL_SLUG;
+		protocol.schemaVersion = Versions.getSchemaVersion();
+		protocol.subgraphVersion = Versions.getSubgraphVersion();
+		protocol.methodologyVersion = Versions.getMethodologyVersion();
+		protocol.network = Network.NEAR_MAINNET;
+		protocol.type = ProtocolType.LENDING;
+		protocol.lendingType = LendingType.POOLED;
+		protocol.riskType = RiskType.GLOBAL;
 		protocol.totalValueLockedUSD = BD_ZERO;
 		protocol.cumulativeUniqueUsers = 0;
 		protocol.cumulativeSupplySideRevenueUSD = BD_ZERO;
@@ -30,7 +31,7 @@ export function getOrCreateProtocol(): LendingProtocol {
 export function getOrCreateUsageMetricsDailySnapshot(
 	receipt: near.ReceiptWithOutcome
 ): UsageMetricsDailySnapshot {
-	const timestamp = receipt.block.header.timestampNanosec / 86400000000000;
+	const timestamp = NANOS_TO_DAY(receipt.block.header.timestampNanosec);
 	const id = timestamp.toString();
 	let usageMetricsDailySnapshot = UsageMetricsDailySnapshot.load(id);
 	const protocol = getOrCreateProtocol()
@@ -52,7 +53,7 @@ export function getOrCreateUsageMetricsDailySnapshot(
 		usageMetricsDailySnapshot.dailyLiquidateCount = 0;
 		usageMetricsDailySnapshot.totalPoolCount = protocol._marketIds.length;
 		usageMetricsDailySnapshot.blockNumber = BigInt.fromU64(receipt.block.header.height);
-		usageMetricsDailySnapshot.timestamp = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000000);
+		usageMetricsDailySnapshot.timestamp = BigInt.fromU64(NANOSEC_TO_SEC(receipt.block.header.timestampNanosec));
 		usageMetricsDailySnapshot.save();
 	}
 	return usageMetricsDailySnapshot as UsageMetricsDailySnapshot;
@@ -62,7 +63,7 @@ export function getOrCreateUsageMetricsDailySnapshot(
 export function getOrCreateUsageMetricsHourlySnapshot( 
 	receipt: near.ReceiptWithOutcome
 ): UsageMetricsHourlySnapshot {
-	const timestamp = receipt.block.header.timestampNanosec / 3600000000000;
+	const timestamp = NANOS_TO_HOUR(receipt.block.header.timestampNanosec);
 	const id = timestamp.toString();
 	let usageMetricsHourlySnapshot = UsageMetricsHourlySnapshot.load(id);
 	const protocol = getOrCreateProtocol()
@@ -77,7 +78,7 @@ export function getOrCreateUsageMetricsHourlySnapshot(
 		usageMetricsHourlySnapshot.hourlyRepayCount = 0;
 		usageMetricsHourlySnapshot.hourlyLiquidateCount = 0;
 		usageMetricsHourlySnapshot.blockNumber = BigInt.fromU64(receipt.block.header.height);
-		usageMetricsHourlySnapshot.timestamp = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000000);
+		usageMetricsHourlySnapshot.timestamp = BigInt.fromU64(NANOSEC_TO_SEC(receipt.block.header.timestampNanosec));
 		usageMetricsHourlySnapshot.save();
 	}
 	return usageMetricsHourlySnapshot as UsageMetricsHourlySnapshot;
@@ -86,7 +87,7 @@ export function getOrCreateUsageMetricsHourlySnapshot(
 export function getOrCreateFinancialDailySnapshot(
 	receipt: near.ReceiptWithOutcome
 ): FinancialsDailySnapshot {
-	const timestamp = receipt.block.header.timestampNanosec / 86400000000000;
+	const timestamp = NANOS_TO_DAY(receipt.block.header.timestampNanosec);
 	const id = timestamp.toString();
 	let financialsDailySnapshot = FinancialsDailySnapshot.load(id);
 	const protocol = getOrCreateProtocol();
@@ -94,7 +95,7 @@ export function getOrCreateFinancialDailySnapshot(
 		financialsDailySnapshot = new FinancialsDailySnapshot(id);
 		financialsDailySnapshot.protocol = getOrCreateProtocol().id;
 		financialsDailySnapshot.blockNumber = BigInt.fromU64(receipt.block.header.height);
-		financialsDailySnapshot.timestamp = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000000);
+		financialsDailySnapshot.timestamp = BigInt.fromU64(NANOSEC_TO_SEC(receipt.block.header.timestampNanosec));
 		financialsDailySnapshot.totalValueLockedUSD = protocol.totalValueLockedUSD
 		financialsDailySnapshot.protocolControlledValueUSD = BD_ZERO
 		financialsDailySnapshot.dailySupplySideRevenueUSD = BD_ZERO

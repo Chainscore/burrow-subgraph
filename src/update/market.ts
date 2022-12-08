@@ -3,7 +3,7 @@ import { Market, MarketDailySnapshot, MarketHourlySnapshot, FinancialsDailySnaps
 import { compound } from '../utils/compound';
 import { updateApr } from '../utils/rates';
 import { getOrCreateToken } from '../helpers/token';
-import { BI_ZERO, BI_BD, BD_BI } from '../utils/const';
+import { BI_ZERO, BD_BI, BD_ZERO, NANOS_TO_MS } from '../utils/const';
 
 export function updateMarket(
 	market: Market,
@@ -70,12 +70,10 @@ export function updateMarket(
 		.toBigDecimal()
 		.div(market.outputTokenSupply.toBigDecimal());
 	} else {
-		market.exchangeRate = BigInt.fromI32(0).toBigDecimal();
+		market.exchangeRate = BD_ZERO
 	}
 	// outputTokenPriceUSD
 	market.outputTokenPriceUSD = market.exchangeRate!.times(
 		market.inputTokenPriceUSD
 	);
-
-	market._last_update_timestamp = BigInt.fromU64(receipt.block.header.timestampNanosec / 1000000);
 }

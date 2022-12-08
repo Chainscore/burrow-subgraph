@@ -19,7 +19,7 @@ export function getOrCreateToken(id: string): Token {
 			token.decimals = metadata.decimals as i32;
 			token.symbol = metadata.symbol;
 		} else {
-			log.warning('Token metadata not found {}', [id]);
+			log.error('Token metadata need to be added for {}', [id]);
 		}
 
 		token.save();
@@ -28,7 +28,7 @@ export function getOrCreateToken(id: string): Token {
 }
 
 export function getOrCreateRewardToken(tokenAddress: string, type: string): RewardToken {
-	let id = type.concat('-').concat(tokenAddress);
+	const id = type.concat('-').concat(tokenAddress);
 	let rewardToken = RewardToken.load(id);
 	if (!rewardToken) {
 		rewardToken = new RewardToken(id);

@@ -1,7 +1,6 @@
-import { Market, InterestRate } from '../../generated/schema';
+import { Market } from '../../generated/schema';
 import { BigDecimal, BigInt, near, log } from '@graphprotocol/graph-ts';
-import { BD_ONE, BD_ZERO, BI_ZERO } from './const';
-import { getOrCreateBorrowRate } from '../helpers/rates';
+import { BD_ONE, BD_ZERO, BI_ZERO, NANOS_TO_MS } from './const';
 
 import { getRate } from './rates';
 import { bigDecimalExponential } from './math';
@@ -9,12 +8,18 @@ import { getOrCreateToken } from '../helpers/token';
 
 const BD = (n: string): BigDecimal => BigDecimal.fromString(n);
 
+/**
+ * Compounds market interest and reserve values
+ * @param market Market
+ * @param receipt near.ReceiptWithOutcome
+ * @returns 
+ */
 export function compound(
 	market: Market,
 	receipt: near.ReceiptWithOutcome
 ): BigDecimal[] {
 	const time_diff_ms = BigInt.fromU64(
-		receipt.block.header.timestampNanosec / 1000000
+		NANOS_TO_MS(receipt.block.header.timestampNanosec)
 	).minus(market._last_update_timestamp);
 
 	if (time_diff_ms.equals(BI_ZERO)) {
@@ -31,15 +36,11 @@ export function compound(
 		.times(market._totalBorrowed)
 		.minus(market._totalBorrowed)
 		.truncate(0);
-
-	const token = getOrCreateToken(market.inputToken);
-	log.info('market {} :: interest: {}', [market.name!, interest.div(BigInt.fromI32(10).pow((token.decimals + token.extraDecimals) as u8).toBigDecimal()).toString()]);
 	
 	if (interestScaled.equals(BD_ONE)) {
 		return [BD_ZERO, BD_ZERO];
 	}
 
-	// TODO: Split interest based on ratio between reserved and supplied?
 	const reserved = interest
 		.times(market._reserveRatio.toBigDecimal())
 		.div(BD('10000'));

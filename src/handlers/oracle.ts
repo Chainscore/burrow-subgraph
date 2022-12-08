@@ -1,27 +1,23 @@
 import {
-	near,
 	BigInt,
-	JSONValue,
-	TypedMap,
 	log,
 	BigDecimal,
 	JSONValueKind,
 } from '@graphprotocol/graph-ts';
 
 import { getOrCreateToken } from '../helpers/token';
-import { getOrCreateProtocol } from '../helpers/protocol';
 import { BD_ZERO } from '../utils/const';
+import { EventData } from '../utils/type';
 
 export function handleOracleCall(
-	method: string,
-	args: string, // only for logging: remove afterwards
-	data: TypedMap<string, JSONValue>,
-	receipt: near.ReceiptWithOutcome
+	event: EventData
 ): void {
-	const controller = getOrCreateProtocol();
+	const data = event.data;
+	const receipt = event.receipt;
+	
 	const eventArgsArr = data.get('data');
 	if (!eventArgsArr) {
-		log.warning('ORACLE::Data not found {}', [args]);
+		log.warning('ORACLE::Data not found {}', []);
 		return;
 	}
 	if (eventArgsArr.kind != JSONValueKind.OBJECT) {
@@ -33,7 +29,7 @@ export function handleOracleCall(
 	const eventArgs = eventArgsArr.toObject();
 	const prices = eventArgs.get('prices');
 	if (!prices) {
-		log.warning('ORACLE::Prices not found. Args: {}', [args]);
+		log.warning('ORACLE::Prices not found. Args: {}', []);
 		return;
 	} else if (prices.kind !== JSONValueKind.ARRAY) {
 		log.warning('ORACLE::Prices kind not array {}', [

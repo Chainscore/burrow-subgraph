@@ -1,11 +1,9 @@
 import { near, BigInt } from '@graphprotocol/graph-ts';
 import { Position, PositionSnapshot, Account, Market } from '../../generated/schema';
-import { BI_ZERO } from '../utils/const';
-import { getOrCreateAccount } from './account';
-import { getOrCreateMarket } from './market';
+import { BI_ZERO, NANOSEC_TO_SEC } from '../utils/const';
 
-export function getOrCreatePosition(account: Account, market: Market, side: string, receipt: near.ReceiptWithOutcome): Position {
-	const id = account.id.concat('-').concat(market.id).concat('-').concat(side).concat('-').concat((account.closedPositionCount + account.openPositionCount).toString());
+export function getOrCreatePosition(account: Account, market: Market, side: string, receipt: near.ReceiptWithOutcome, count: i32): Position {
+	const id = account.id.concat('-').concat(market.id).concat('-').concat(side).concat('-').concat(count.toString());
 	let r = Position.load(id);
 	if (!r) {
 		r = new Position(id);
@@ -15,7 +13,7 @@ export function getOrCreatePosition(account: Account, market: Market, side: stri
 		r.hashClosed = null;
 		r.blockNumberOpened = BigInt.fromU64(receipt.block.header.height);
 		r.blockNumberClosed = null;
-		r.timestampOpened = BigInt.fromU64(receipt.block.header.timestampNanosec/1000000);
+		r.timestampOpened = BigInt.fromU64(NANOSEC_TO_SEC(receipt.block.header.timestampNanosec));
 		r.timestampClosed = null;
 		r.side = side;
 		r.isCollateral = true;
@@ -47,7 +45,7 @@ export function getOrCreatePositionSnapshot(position: Position, receipt: near.Re
 	if (!r) {
 		r = new PositionSnapshot(id);
 		r.position = position.id;
-		r.timestamp = BigInt.fromU64(receipt.block.header.timestampNanosec/1000000000) 
+		r.timestamp = BigInt.fromU64(NANOSEC_TO_SEC(receipt.block.header.timestampNanosec)) 
 		r.blockNumber = BigInt.fromU64(receipt.block.header.height)
 		r.nonce = BI_ZERO;
 		r.logIndex = 0;

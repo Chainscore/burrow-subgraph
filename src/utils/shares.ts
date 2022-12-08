@@ -1,5 +1,5 @@
 import { BigInt, BigDecimal } from '@graphprotocol/graph-ts';
-import { BI_ZERO, BD_ZERO, BI_BD, BD_BI } from './const';
+import { BD_ZERO, BD_BI } from './const';
 
 // convert token amounts to output shares
 export function amount_to_shares(amount: BigDecimal, total_shares: BigInt, total_amount: BigDecimal): BigInt {

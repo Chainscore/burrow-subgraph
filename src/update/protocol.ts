@@ -1,11 +1,11 @@
 import { Market } from '../../generated/schema';
 import { BD_ZERO } from '../utils/const';
-import { getOrCreateProtocol, getOrCreateUsageMetricsDailySnapshot } from '../helpers/protocol';
-import { near, BigInt } from '@graphprotocol/graph-ts';
+import { getOrCreateProtocol } from '../helpers/protocol';
+import { BigInt } from '@graphprotocol/graph-ts';
 import { getOrCreateToken } from '../helpers/token';
 
 export function updateProtocol(): void {
-	let protocol = getOrCreateProtocol();
+	const protocol = getOrCreateProtocol();
 
 	protocol.totalValueLockedUSD = BD_ZERO;
 	protocol.cumulativeSupplySideRevenueUSD = BD_ZERO;
